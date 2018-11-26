@@ -393,6 +393,10 @@ class LIFNodes(Nodes):
         # Integrate inputs.
         self.v += (self.refrac_count == 0).float() * x
 
+        # voltage clipping to lowerbound
+        if self.lbound is not None:
+            self.v.masked_fill_(self.v < self.lbound, self.lbound)
+
         # Decrement refractory counters.
         self.refrac_count[self.refrac_count != 0] -= self.dt
 
@@ -403,9 +407,6 @@ class LIFNodes(Nodes):
         self.refrac_count.masked_fill_(self.s, self.refrac)
         self.v.masked_fill_(self.s, self.reset)
 
-        # voltage clipping to lowerbound
-        if self.lbound is not None:
-            self.v.masked_fill_(self.v < self.lbound, self.lbound)
 
         super().forward(x)
 
@@ -418,6 +419,120 @@ class LIFNodes(Nodes):
         self.v = self.rest * torch.ones(self.shape)  # Neuron voltages.
         self.refrac_count = torch.zeros(self.shape)  # Refractory period counters.
 
+class NoisyLIFNodes(Nodes):
+    # language=rst
+    """
+    Layer of leaky integrate-and-fire (LIF) neurons with noisy voltage. A neuron's voltage threshold has noise
+    whose distribution is Gaussian. So the firing of the neuron is stochastic process.
+    """
+
+    def __init__(self, n: Optional[int] = None, shape: Optional[Iterable[int]] = None, traces: bool = False,
+                 trace_tc: Union[float, torch.Tensor] = 5e-2, sum_input: bool = False,
+                 thresh: Union[float, torch.Tensor] = -52.0, rest: Union[float, torch.Tensor] = -65.0,
+                 reset: Union[float, torch.Tensor] = -65.0, refrac: Union[int, torch.Tensor] = 5,
+                 lbound: float = None, noise_std: float = None, noise_decay: float = None,
+                 decay: Union[float, torch.Tensor] = 1e-2) -> None:
+        # language=rst
+        """
+        Instantiates a layer of LIF neurons.
+
+        :param n: The number of neurons in the layer.
+        :param shape: The dimensionality of the layer.
+        :param traces: Whether to record spike traces.
+        :param trace_tc: Time constant of spike trace decay.
+        :param sum_input: Whether to sum all inputs.
+        :param thresh: Spike threshold voltage.
+        :param rest: Resting membrane voltage.
+        :param reset: Post-spike reset voltage.
+        :param refrac: Refractory (non-firing) period of the neuron.
+        :param lbound: Lower bound of the voltage.
+        :param noise_std: Standard deviation of the Gaussian noise.
+        :param noise_decay: Decay coefficient of noise_std.
+        :param decay: Time constant of neuron voltage decay.
+        """
+        super().__init__(n, shape, traces, trace_tc, sum_input)
+
+        # Rest voltage.
+        if isinstance(rest, float):
+            self.rest = torch.tensor(rest)
+        else:
+            self.rest = rest
+
+        # Post-spike reset voltage.
+        if isinstance(reset, float):
+            self.reset = torch.tensor(reset)
+        else:
+            self.reset = reset
+
+        # Spike threshold voltage.
+        if isinstance(thresh, float):
+            self.thresh = torch.tensor(thresh)
+        else:
+            self.thresh = thresh
+
+        # Post-spike refractory period.
+        if isinstance(refrac, float):
+            self.refrac = torch.tensor(refrac)
+        else:
+            self.refrac = refrac
+
+        # Rate of decay of neuron voltage.
+        if isinstance(decay, float):
+            self.decay = torch.tensor(decay)
+        else:
+            self.decay = decay
+
+        # Lower bound of voltage.
+        self.lbound = lbound
+        self.noise_std = noise_std
+        self.noise_decay = noise_decay
+
+        self.v = self.rest * torch.ones(self.shape)  # Neuron voltages.
+        self.refrac_count = torch.zeros(self.shape)  # Refractory period counters.
+
+    def forward(self, x: torch.Tensor) -> None:
+        # language=rst
+        """
+        Runs a single simulation step.
+
+        :param x: Inputs to the layer.
+        """
+        # Decay voltages.
+        self.v -= self.dt * self.decay * (self.v - self.rest)
+
+        # Integrate inputs.
+        self.v += (self.refrac_count == 0).float() * x
+
+        # voltage clipping to lowerbound
+        if self.lbound is not None:
+            self.v.masked_fill_(self.v < self.lbound, self.lbound)
+
+        # Decrement refractory counters.
+        self.refrac_count[self.refrac_count != 0] -= self.dt
+
+        # Check for spiking neurons.
+        if self.noise_std is not None:
+            noise = torch.randn(self.s.shape) * self.noise_std
+            self.s = self.v + noise >= self.thresh
+            self.noise_std -= self.dt * self.noise_decay * self.noise_std
+        else:
+            self.s = self.v >= self.thresh
+
+        # Refractoriness and voltage reset.
+        self.refrac_count.masked_fill_(self.s, self.refrac)
+        self.v.masked_fill_(self.s, self.reset)
+
+
+        super().forward(x)
+
+    def reset_(self) -> None:
+        # language=rst
+        """
+        Resets relevant state variables.
+        """
+        super().reset_()
+        self.v = self.rest * torch.ones(self.shape)  # Neuron voltages.
+        self.refrac_count = torch.zeros(self.shape)  # Refractory period counters.
 
 class AdaptiveLIFNodes(Nodes):
     # language=rst
@@ -516,6 +631,10 @@ class AdaptiveLIFNodes(Nodes):
         # Integrate inputs.
         self.v += (self.refrac_count == 0).float() * x
 
+        # voltage clipping to lowerbound
+        if self.lbound is not None:
+            self.v.masked_fill_(self.v < self.lbound, self.lbound)
+
         # Decrement refractory counters.
         self.refrac_count[self.refrac_count != 0] -= self.dt
 
@@ -527,9 +646,6 @@ class AdaptiveLIFNodes(Nodes):
         self.v.masked_fill_(self.s, self.reset)
         self.theta += self.theta_plus * self.s.float()
 
-        # voltage clipping to lowerbound
-        if self.lbound is not None:
-            self.v.masked_fill_(self.v < self.lbound, self.lbound)
 
     def reset_(self) -> None:
         # language=rst
