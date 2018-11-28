@@ -17,7 +17,7 @@ class AbstractConnection(ABC):
     """
 
     def __init__(self, source: Nodes, target: Nodes,
-                 nu: Optional[Union[float, Sequence[float]]] = None, weight_decay: float = 0.0, **kwargs) -> None:
+                 nu: Optional[Union[float, Sequence[float]]] = None, weight_decay: float = 0.0, dt: float = 1.0, **kwargs) -> None:
         # language=rst
         """
         Constructor for abstract base class for connection objects.
@@ -26,6 +26,7 @@ class AbstractConnection(ABC):
         :param target: A layer of nodes to which the connection connects.
         :param nu: Learning rate for both pre- and post-synaptic events.
         :param weight_decay: Constant multiple to decay weights by on each iteration.
+        :param dt: Time length of single timestep.
 
         Keyword arguments:
 
@@ -39,6 +40,7 @@ class AbstractConnection(ABC):
         self.target = target
         self.nu = nu
         self.weight_decay = weight_decay
+        self.dt = dt
 
         assert isinstance(source, Nodes), 'Source is not a Nodes object'
         assert isinstance(target, Nodes), 'Target is not a Nodes object'
@@ -109,7 +111,7 @@ class Connection(AbstractConnection):
     """
 
     def __init__(self, source: Nodes, target: Nodes, nu: Optional[Union[float, Sequence[float]]] = None,
-                 weight_decay: float = 0.0, **kwargs) -> None:
+                 weight_decay: float = 0.0, dt:float = 1.0, **kwargs) -> None:
         # language=rst
         """
         Instantiates a :code:`Connection` object.
@@ -118,6 +120,7 @@ class Connection(AbstractConnection):
         :param target: A layer of nodes to which the connection connects.
         :param nu: Learning rate for both pre- and post-synaptic events.
         :param weight_decay: Constant multiple to decay weights by on each iteration.
+        :param dt: Time length of single timestep.
 
         Keyword arguments:
 
@@ -128,7 +131,7 @@ class Connection(AbstractConnection):
         :param float wmax: Maximum allowed value on the connection weights.
         :param float norm: Total weight per target neuron normalization constant.
         """
-        super().__init__(source, target, nu, weight_decay, **kwargs)
+        super().__init__(source, target, nu, weight_decay, dt, **kwargs)
 
         self.w = kwargs.get('w', None)
         if self.w is None:
@@ -141,6 +144,7 @@ class Connection(AbstractConnection):
                 self.w = torch.clamp(self.w, self.wmin, self.wmax)
 
         self.b = kwargs.get('b', torch.zeros(target.n))
+
 
     def compute(self, s: torch.Tensor) -> torch.Tensor:
         # language=rst

@@ -10,7 +10,7 @@ from ..encoding import bernoulli
 from ..network.nodes import Input
 from ..environment import Environment
 from ..network.monitors import Monitor
-from ..analysis.plotting import plot_spikes, plot_voltages
+from ..analysis.plotting import plot_spikes, plot_voltages, plot_weights
 
 __all__ = [
     'Pipeline', 'action'
@@ -65,6 +65,7 @@ class Pipeline:
         self.history_index = 1
         self.s_ims, self.s_axes = None, None
         self.v_ims, self.v_axes = None, None
+        self.w_axes = None
         self.obs_im, self.obs_ax = None, None
         self.reward_im, self.reward_ax = None, None
         self.accumulated_reward = 0
@@ -187,7 +188,7 @@ class Pipeline:
         # Plot relevant data.
         if self.plot_interval is not None and self.iteration % self.plot_interval == 0:
             self.plot_data()
-
+            self.plot_connection()
             if self.iteration > len(self.history) * self.delta:
                 self.plot_obs()
 
@@ -253,6 +254,19 @@ class Pipeline:
 
         plt.pause(1e-8)
         plt.show()
+
+    def plot_connection(self) -> None:
+        """
+        plot weight connections.
+        """
+        n_subplots = len(self.network.connections.keys())
+        if self.w_axes is None:
+            _, self.w_axes = plt.subplots(n_subplots, 1, figsize=(10,4))
+
+        for i, datum in enumerate(self.network.connections.items()):
+            weights = datum[1].w
+            self.w_axes[i].pcolormesh(weights,cmap='jet')
+
 
     def update_history(self) -> None:
         # language=rst
