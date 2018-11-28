@@ -80,18 +80,27 @@ class Network:
         plt.tight_layout(); plt.show()
     """
 
-    def __init__(self, dt: float = 1.0) -> None:
+    def __init__(self, dt: float = 1.0, is_actor_critic=False, critic_coeff=1.0, critic_bias=0.0) -> None:
         # language=rst
         """
         Initializes network object.
-
         :param dt: Simulation timestep. All other objects' time constants are relative to this value.
+
+        Keyword Arguments
+        :param is_actor_critic: Boolean variable which indicates this network is actor critic network.
+                If this is the case, reward prediction error signal instead of reward itself is used for learning.
+        :param critic_coeff: a in "reward_prediction = a*num_spikes_in_critic + b"
+        :param critic_bias: b in "reward_prediction = a*num_spikes_in_critic + b"
         """
         self.dt = dt
         self.layers = {}
         self.connections = {}
         self.monitors = {}
         self.learning = True
+
+        self.is_actor_critic = is_actor_critic
+        self.critic_coeff = critic_coeff
+        self.critic_bias = critic_bias
 
     def add_layer(self, layer: Nodes, name: str) -> None:
         # language=rst

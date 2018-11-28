@@ -50,6 +50,7 @@ class Pipeline:
         :param bool render_interval: Interval to render the environment.
         :param int save_interval: How often to save the network to disk.
         :param str output: String name of the layer from which to take output from.
+        :param str critic: String name of the critic layer.
         :param float plot_length: Relative time length of the plotted record data.
             Relative to parameter time.
         :param str plot_type: Type of plotting. 'color' or 'line'
@@ -75,6 +76,7 @@ class Pipeline:
         self.time = kwargs.get('time', 1)
         self.delta = kwargs.get('delta', 1)
         self.output = kwargs.get('output', None)
+        self.critic = kwargs.get('critic',None)
         self.save_dir = kwargs.get('save_dir', 'network.pt')
         self.plot_interval = kwargs.get('plot_interval', None)
         self.save_interval = kwargs.get('save_interval', None)
@@ -103,6 +105,10 @@ class Pipeline:
             self.spike_record = {l: torch.Tensor().byte() for l in self.network.layers}
             self.set_spike_data()
             self.plot_data()
+
+        assert not(self.critic is None and self.network.is_actor_critic is True), 'critic layer should be specified'
+        assert not(self.critic is not None and self.network.is_actor_critic is False), 'The network is not actor_critic.'
+
 
         # Set up for multiple layers of input layers.
         self.encoded = {key: torch.Tensor() for key, val in network.layers.items() if type(val) == Input}
@@ -173,6 +179,13 @@ class Pipeline:
         # Run a step of the environment.
         self.obs, self.reward, self.done, info = self.env.step(a)
 
+        if self.network.is_actor_critic is True:
+            self.prediction = self.reward_prediction()
+            self.rpe = self.reward - self.prediction
+            print("RPE = Reward - Prediction")
+            print(f"{self.rpe} = {self.reward} - {self.prediction}")
+            self.reward = self.rpe
+
         # Store frame of history and encode the inputs.
         if self.enable_history and len(self.history) > 0:
             self.update_history()
@@ -200,6 +213,19 @@ class Pipeline:
             self.reward_list.append(self.accumulated_reward)
             self.accumulated_reward = 0
             self.plot_reward()
+
+    def reward_prediction(self) -> float:
+        """
+        Returns reward prediction based on critic layer's activity.
+
+        :return: Reward prediction value. Calculated as "a * num_spikes - b"
+        """
+
+        assert hasattr(self, 'spike_record'), 'Pipeline has not attribute named: spike_record.'
+        num_spikes = torch.sum(self.spike_record[self.critic])
+        reward_prediction = self.network.critic_coeff * num_spikes + self.network.critic_bias
+
+        return reward_prediction
 
     def plot_obs(self) -> None:
         # language=rst
@@ -265,7 +291,7 @@ class Pipeline:
 
         for i, datum in enumerate(self.network.connections.items()):
             weights = datum[1].w
-            self.w_axes[i].pcolormesh(weights,cmap='jet')
+            self.w_axes[i].pcolormesh(weights,cmap='jet',vmin=datum[1].wmin, vmax=datum[1].wmax)
 
 
     def update_history(self) -> None:

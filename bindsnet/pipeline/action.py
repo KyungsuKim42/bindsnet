@@ -91,6 +91,10 @@ def num_spike(pipeline: Pipeline, **kwargs) -> torch.Tensor:
 
     :param pipeline Pipeline with environment that has an integer action space.
     :return: accumulated spike count for each action element.
+
+    Keyword Arguments:
+
+    :param str output: Name of output layer whose activity to base action selection on.
     """
     try:
         output = kwargs['output']
@@ -106,5 +110,5 @@ def num_spike(pipeline: Pipeline, **kwargs) -> torch.Tensor:
 
     pop_size = int(spikes.shape[0] / n_action)
     action = torch.Tensor([spikes[(i * pop_size):(i * pop_size) + pop_size].sum() for i in range(n_action)])
-    
+
     return action
