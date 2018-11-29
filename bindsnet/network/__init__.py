@@ -5,6 +5,7 @@ from typing import Dict
 from .nodes import AbstractInput, Nodes
 from .topology import AbstractConnection
 from .monitors import AbstractMonitor
+from ..learning import MSTDP, MSTDPET
 
 __all__ = [
     'load_network', 'Network', 'nodes', 'monitors', 'topology'
@@ -254,6 +255,12 @@ class Network:
         # Get input to all layers.
         inpts.update(self.get_inputs())
 
+        for c in self.connections:
+            if isinstance(self.connections[c].update_rule, (MSTDP, MSTDPET)):
+                self.connections[c].update(
+                    mask=masks.get(c, None), learning=self.learning, **kwargs
+                )
+
         # Simulate network activity for `time` timesteps.
         for t in range(timesteps):
             for l in self.layers:
@@ -270,9 +277,10 @@ class Network:
 
             # Run synapse updates.
             for c in self.connections:
-                self.connections[c].update(
-                    mask=masks.get(c, None), learning=self.learning, **kwargs
-                )
+                if not isinstance(self.connections[c].update_rule, (MSTDP, MSTDPET)):
+                    self.connections[c].update(
+                        mask=masks.get(c, None), learning=self.learning, **kwargs
+                    )
 
             # Get input to all layers.
             inpts.update(self.get_inputs())
@@ -281,9 +289,9 @@ class Network:
             for m in self.monitors:
                 self.monitors[m].record()
 
-        # Re-normalize connections.
-        for c in self.connections:
-            self.connections[c].normalize()
+            # Re-normalize connections.
+            for c in self.connections:
+                self.connections[c].normalize()
 
 
     def reset_(self) -> None:

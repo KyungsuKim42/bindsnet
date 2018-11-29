@@ -45,7 +45,7 @@ class AbstractConnection(ABC):
         assert isinstance(source, Nodes), 'Source is not a Nodes object'
         assert isinstance(target, Nodes), 'Target is not a Nodes object'
 
-        from ..learning import NoOp
+        from ..learning import NoOp, MSTDP, MSTDPET
 
         self.update_rule = kwargs.get('update_rule', NoOp)
         self.wmin = kwargs.get('wmin', None)
@@ -55,6 +55,8 @@ class AbstractConnection(ABC):
 
         if self.update_rule is None:
             self.update_rule = NoOp
+
+        self.update_done = False
 
         self.a_pre = 0.0
 

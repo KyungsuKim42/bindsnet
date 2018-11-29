@@ -201,7 +201,7 @@ class Pipeline:
         # Plot relevant data.
         if self.plot_interval is not None and self.iteration % self.plot_interval == 0:
             self.plot_data()
-            self.plot_connection()
+            #self.plot_connection()
             if self.iteration > len(self.history) * self.delta:
                 self.plot_obs()
 
@@ -222,7 +222,7 @@ class Pipeline:
         """
 
         assert hasattr(self, 'spike_record'), 'Pipeline has not attribute named: spike_record.'
-        num_spikes = torch.sum(self.spike_record[self.critic])
+        num_spikes = torch.sum(self.spike_record[self.critic][:,-self.timestep:])
         reward_prediction = self.network.critic_coeff * num_spikes + self.network.critic_bias
 
         return reward_prediction

@@ -102,13 +102,14 @@ def num_spike(pipeline: Pipeline, **kwargs) -> torch.Tensor:
         raise KeyError('num_spike() requires an "output" layer argument.')
 
     assert hasattr(pipeline, 'spike_record'), 'Pipeline has not attribute named: spike_record.'
-    spikes = torch.sum(pipeline.spike_record[output], dim=1)
+    spike = pipeline.spike_record[output][:,-pipeline.timestep:]
+    num_spike = torch.sum(spike, dim=1)
 
     # n_action is temporal variable that only exists in MNSITEnvironment. This code sould be generalized.
     n_action = pipeline.env.n_action
-    assert spikes.shape[0] % n_action == 0, 'Output layer size not equal to size of action space.'
+    assert num_spike.shape[0] % n_action == 0, 'Output layer size not equal to size of action space.'
 
-    pop_size = int(spikes.shape[0] / n_action)
-    action = torch.Tensor([spikes[(i * pop_size):(i * pop_size) + pop_size].sum() for i in range(n_action)])
+    pop_size = int(num_spike.shape[0] / n_action)
+    action = torch.Tensor([num_spike[(i * pop_size):(i * pop_size) + pop_size].sum() for i in range(n_action)])
 
     return action
