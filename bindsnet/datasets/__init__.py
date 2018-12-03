@@ -56,6 +56,59 @@ class Dataset(ABC):
         """
         pass
 
+class CustomDataset(Dataset):
+    # language=rst
+    """
+    Custom Dataset.
+    """
+
+    def __init__(self, train_input=None, test_label=None, test_data=None, test_label=None, shuffle=True) -> None:
+        # language=rst
+        """
+        Constructor for CustomDataset class.
+
+        :param train_data: Training data in shape [N,?], numpy array
+        :param train_data: Training label in shape [N,1], numpy array
+        :param test_data: Testing data in shape [M,?], numpy array
+        :param test_data: Testing label in shape [M,1], numpy array
+        :param shuffle: Whether to randomly permute order of dataset.
+        """
+        assert train_data.shape[0] == train_label.shape[0], 'Number of samples of train_data and train_label is different'
+        assert test_dat.shape[0] == test_label.shape[0], 'Number of samples of test_data and test_label is different'
+        assert train_data.shape[1:] == test_data.shape[1:], 'Feature shape of train_data and test_data is different'
+
+        self.train_data = train_data
+        self.train_label = train_label
+        self.test_data = test_data
+        self.test_label = test_label
+
+        self.shuffle = shuffle
+
+    def get_train(self) -> torch.Tensor:
+        # language=rst
+        """
+        Abstract method stub for fetching training data from a dataset.
+        """
+        assert self.train_data is not None and self.train_label is not None, 'Train dataset is incomplete.'
+        if self.shuffle:
+            perm = np.random.permutation(np.arange(self.train_label.shape[0]))
+            self.train_label = self.train_label[perm]
+            self.train_data = self.train_data[perm]
+
+        return torch.Tensor(self.train_data), torch.Tensor(self.train_label)
+
+    def get_test(self) -> torch.Tensor:
+        # language=rst
+        """
+        Abstract method stub for fetching test data from a dataset.
+        """
+        assert self.test_data is not None and self.test_label is not None, 'Test dataset is incomplete.'
+        if self.shuffle:
+            perm = np.random.permutation(np.arange(self.test_label.shape[0]))
+            self.test_label = self.test_label[perm]
+            self.test_data = self.test_data[perm]
+
+        return torch.Tensor(self.test_data), torch.Tensor(self.test_label)
 
 class MNIST(Dataset):
     # language=rst
