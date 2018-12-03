@@ -73,19 +73,17 @@ class DatasetEnvironment(Environment):
     A wrapper around any object from the ``datasets`` module to pass to the ``Pipeline`` object.
     """
 
-    def __init__(self, dataset: Dataset, train: bool = True, time: int = 350, **kwargs):
+    def __init__(self, dataset: Dataset, train: bool = True, **kwargs):
         # language=rst
         """
         Initializes the environment wrapper around the dataset.
 
         :param dataset: Object from datasets module.
         :param train: Whether to use train or test dataset.
-        :param time: Length of spike train per example.
         :param kwargs: Raw data is multiplied by this value.
         """
         self.dataset = dataset
         self.train = train
-        self.time = time
 
         # Keyword arguments.
         self.intensity = kwargs.get('intensity', 1)
@@ -181,19 +179,17 @@ class MNISTEnvironment(Environment):
     Specifically designed environment for reward-based MNIST classification task.
     It recieves 10-dimensional vector as an action and returns corresponding reward.
     """
-    def __init__(self, dataset: Dataset, train: bool = True, time: int = 350, **kwargs):
+    def __init__(self, dataset: Dataset, train: bool = True, **kwargs):
         # language=rst
         """
         Initializes the environment wrapper around the dataset.
 
         :param dataset: Object from datasets module.
         :param train: Whether to use train or test dataset.
-        :param time: Length of spike train per example.
         :param kwargs: Raw data is multiplied by this value.
         """
         self.dataset = dataset
         self.train = train
-        self.time = time
         self.n_action = 10
 
         self.axes = None

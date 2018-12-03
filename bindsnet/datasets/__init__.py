@@ -62,7 +62,7 @@ class CustomDataset(Dataset):
     Custom Dataset.
     """
 
-    def __init__(self, train_input=None, test_label=None, test_data=None, test_label=None, shuffle=True) -> None:
+    def __init__(self, train_data=None, test_label=None, test_data=None, test_label=None, shuffle=True) -> None:
         # language=rst
         """
         Constructor for CustomDataset class.
