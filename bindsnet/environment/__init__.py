@@ -84,6 +84,7 @@ class DatasetEnvironment(Environment):
         """
         self.dataset = dataset
         self.train = train
+        self.n_action = None
 
         # Keyword arguments.
         self.intensity = kwargs.get('intensity', 1)
@@ -170,8 +171,10 @@ class DatasetEnvironment(Environment):
         elif type(self.dataset) in [CIFAR10, CIFAR100]:
             temp = self.obs.view(32, 32, 3).cpu().numpy() / self.intensity
             return temp / temp.max()
-        elif type(self.dataset) in SpokenMNIST:
+        elif type(self.dataset) in [SpokenMNIST]:
             return self.obs.view(-1, 40)
+        else:
+            return np.ones([1,1])
 
 class MNISTEnvironment(Environment):
     # language=rst

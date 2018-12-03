@@ -162,7 +162,8 @@ def rank_order(datum: torch.Tensor, time: int, dt: float = 1.0, **kwargs) -> tor
     datum /= datum.max()
     times = torch.zeros(size)
     times[datum != 0] = 1 / datum[datum != 0]
-    times *= time / times.max()  # Extended through simulation time.
+    times *= time / (times.max()-times.min())  # Extended through simulation time.
+    times -= times.min()
     times = torch.ceil(times).long()
 
     # Create spike times tensor.

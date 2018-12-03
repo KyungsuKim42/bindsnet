@@ -62,7 +62,7 @@ class CustomDataset(Dataset):
     Custom Dataset.
     """
 
-    def __init__(self, train_data=None, test_label=None, test_data=None, test_label=None, shuffle=True) -> None:
+    def __init__(self, train_data=None, train_label=None, test_data=None, test_label=None, shuffle=True) -> None:
         # language=rst
         """
         Constructor for CustomDataset class.
@@ -73,9 +73,12 @@ class CustomDataset(Dataset):
         :param test_data: Testing label in shape [M,1], numpy array
         :param shuffle: Whether to randomly permute order of dataset.
         """
-        assert train_data.shape[0] == train_label.shape[0], 'Number of samples of train_data and train_label is different'
-        assert test_dat.shape[0] == test_label.shape[0], 'Number of samples of test_data and test_label is different'
-        assert train_data.shape[1:] == test_data.shape[1:], 'Feature shape of train_data and test_data is different'
+        if test_data is not None:
+            assert train_data.shape[0] == train_label.shape[0], 'Number of samples of train_data and train_label is different'
+        if test_data is not None:
+            assert test_data.shape[0] == test_label.shape[0], 'Number of samples of test_data and test_label is different'
+        if train_data is not None and test_data is not None:
+            assert train_data.shape[1:] == test_data.shape[1:], 'Feature shape of train_data and test_data is different'
 
         self.train_data = train_data
         self.train_label = train_label

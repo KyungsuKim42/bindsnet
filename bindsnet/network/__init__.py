@@ -86,6 +86,7 @@ class Network:
         """
         Initializes network object.
         :param dt: Simulation timestep. All other objects' time constants are relative to this value.
+                   This is required because reward-modulated learning rules runs depending on dt.
 
         Keyword Arguments
         :param is_actor_critic: Boolean variable which indicates this network is actor critic network.
