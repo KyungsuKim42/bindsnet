@@ -26,9 +26,11 @@ class Pipeline:
     action.
     """
 
-    def __init__(self, network: Network, environment: Environment, encoding: Callable = bernoulli,
-                 action_function: Optional[Callable] = None, enable_history: Optional[bool] = False,
-                 **kwargs):
+    def __init__(
+            self, network: Network, environment: Environment,
+            encoding: Callable = bernoulli,
+            action_function: Optional[Callable] = None,
+            enable_history: Optional[bool] = False, **kwargs):
         # language=rst
         """
         Initializes the pipeline.
@@ -71,6 +73,7 @@ class Pipeline:
         self.reward_im, self.reward_ax = None, None
         self.accumulated_reward = 0
         self.reward_list = []
+        self.action = None
 
         # Setting kwargs.
         self.time = kwargs.get('time', 1)
@@ -94,28 +97,39 @@ class Pipeline:
         else:
             self.history = {}
 
+        # Replace this
         if self.plot_interval is not None:
             for l in self.network.layers:
-                self.network.add_monitor(Monitor(self.network.layers[l], 's', int(self.plot_length * self.plot_interval * self.timestep)),
-                                         name=f'{l}_spikes')
-                if 'v' in self.network.layers[l].__dict__:
-                    self.network.add_monitor(Monitor(self.network.layers[l], 'v', int(self.plot_length * self.plot_interval * self.timestep)),
-                                             name=f'{l}_voltages')
+                self.network.add_monitor(Monitor(self.network.layers[l], 's',
+                        int(self.plot_length * self.plot_interval * \
+                        self.timestep)), name=f'{l}_spikes')
 
+                if 'v' in self.network.layers[l].__dict__:
+                    self.network.add_monitor(Monitor(self.network.layers[l],
+                        'v', int(self.plot_length * self.plot_interval * \
+                        self.timestep)), name=f'{l}_voltages')
             self.spike_record = {l: torch.Tensor().byte() for l in self.network.layers}
             self.set_spike_data()
-            self.plot_data()
+            # self.plot_data()
+        # To this
+        # self.agent.set_monitor(self.plot_length, self.plot_interval)
+        # self.spike_record = {l: torch.Tensor().byte() for l in self.network.layers}
+        # self.set_spike_data()
 
-        assert not(self.critic is None and self.network.is_actor_critic is True), 'critic layer should be specified'
-        assert not(self.critic is not None and self.network.is_actor_critic is False), 'The network is not actor_critic.'
+        assert not(self.critic is None and self.network.is_actor_critic is True
+            ), 'critic layer should be specified'
+        assert not(self.critic is not None and self.network.is_actor_critic is
+            False), 'The network is not actor_critic.'
 
 
         # Set up for multiple layers of input layers.
-        self.encoded = {key: torch.Tensor() for key, val in network.layers.items() if type(val) == Input}
+        self.encoded = {key: torch.Tensor() for key, val in
+            network.layers.items() if type(val) == Input}
 
         self.obs = None
         self.reward = None
         self.done = None
+        self.action = np.random.randint(self.agent.num_action)
 
         self.voltage_record = None
 
@@ -170,21 +184,11 @@ class Pipeline:
         if self.render_interval is not None and self.iteration % self.render_interval == 0:
             self.env.render()
 
-        # Choose action based on output neuron spiking.
-        if self.action_function is not None:
-            a = self.action_function(self, output=self.output)
-        else:
-            a = None
-
         # Run a step of the environment.
-        self.obs, self.reward, self.done, info = self.env.step(a)
+        self.obs, self.reward, self.done, info = self.env.step(self.action)
 
-        if self.network.is_actor_critic is True:
-            self.prediction = self.reward_prediction()
-            self.rpe = self.reward - self.prediction
-            print("RPE = Reward - Prediction")
-            print(f"{self.rpe} = {self.reward} - {self.prediction}")
-            self.reward = self.rpe
+        # Run a step of the agent.
+        self.action = self.agent.step(self.obs, self.reward)
 
         # Store frame of history and encode the inputs.
         if self.enable_history and len(self.history) > 0:
@@ -193,13 +197,17 @@ class Pipeline:
 
         # Encode the observation using given encoding function.
         for inpt in self.encoded:
-            self.encoded[inpt] = self.encoding(self.obs, time=self.time, max_prob=self.env.max_prob, dt=self.network.dt)
+            self.encoded[inpt] = self.encoding(
+                    self.obs, time=self.time, max_prob=self.env.max_prob,
+                    dt=self.network.dt)
 
         # Run the network on the spike train-encoded inputs.
-        self.network.run(inpts=self.encoded, time=self.time, reward=self.reward, clamp=clamp, clamp_v=clamp_v)
+        self.network.run(inpts=self.encoded, time=self.time, reward=self.reward,
+                         clamp=clamp, clamp_v=clamp_v)
 
         # Plot relevant data.
-        if self.plot_interval is not None and self.iteration % self.plot_interval == 0:
+        if self.plot_interval is not None and \
+                self.iteration % self.plot_interval == 0:
             self.plot_data()
             #self.plot_connection()
             if self.iteration > len(self.history) * self.delta:
