@@ -532,9 +532,6 @@ class MSTDPET(LearningRule):
         # Calculate value of eligibility trace.
         self.e_trace += torch.ger(self.p_plus, target_s) + torch.ger(source_s, self.p_minus)
 
-        # Compute weight update.
-        self.connection.w += self.nu[0] * reward * self.e_trace
-
     def _conv2d_connection_update(self, **kwargs) -> None:
         # language=rst
         """
@@ -577,5 +574,9 @@ class MSTDPET(LearningRule):
         # Calculate value of eligibility trace.
         self.e_trace = post + pre
 
+        # Compute weight update.
+        self.connection.w += self.nu[0] * reward * self.e_trace
+
+    def weight_update(self, reward:float = None) -> None:
         # Compute weight update.
         self.connection.w += self.nu[0] * reward * self.e_trace
