@@ -10,7 +10,7 @@ from ..encoding import bernoulli
 from ..network.nodes import Input
 from ..environment import Environment
 from ..network.monitors import Monitor
-from ..analysis.plotting import plot_spikes, plot_voltages, plot_weights
+from ..analysis.plotting import plot_spikes, plot_voltages
 
 __all__ = [
     'Pipeline', 'action'
@@ -115,7 +115,6 @@ class Pipeline:
         clamp = kwargs.get('clamp', {})
         clamp_v = kwargs.get('clamp_v', {})
 
-
         if self.print_interval is not None and self.iteration % self.print_interval == 0:
             print(f'Iteration: {self.iteration} (Time: {time.time() - self.clock:.4f})')
             self.clock = time.time()
@@ -127,14 +126,18 @@ class Pipeline:
 
         # Run a step of the environment.
         self.obs, self.reward, self.done, info = self.env.step(self.action)
+        print(self.reward)
         # Render game.
         if self.render_interval is not None and self.iteration % self.render_interval == 0:
             self.env.render()
-
         # Update weights based on reward-modulated learning rules.
-        self.agent.update(self.reward)
+        self.agent.reward_modulated_update(self.reward, self.action)
+        # Reset eligibility traces and other update-related traces
+        self.agent.reset()
         # Run a step for calculating the next action.
+        # Should I remove self.reward?
         self.action = self.agent.step(self.obs, self.reward)
+
         # Plot relevant data.
         if self.plot_interval is not None and \
                 self.iteration % self.plot_interval == 0:

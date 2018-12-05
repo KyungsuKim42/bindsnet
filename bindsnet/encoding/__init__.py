@@ -4,8 +4,9 @@ import math
 from typing import Optional, Union, Iterable, Iterator
 
 #TODO remove np uses and replace them with pytorch functions.
-def single(datum: torch.Tensor, time: int = None,
-           sparsity: float = 0.3, max_prob:float = None) -> torch.Tensor:
+def single(datum: torch.Tensor, time: int = None, dt:float = 1.0,
+           sparsity: float = 0.2, max_prob:float = None) -> torch.Tensor:
+    # language=rst
     # language=rst
     """
     Generates timing based single-spike encoding. Spike occurs earlier if the
@@ -18,11 +19,11 @@ def single(datum: torch.Tensor, time: int = None,
     :param max_prob: Dummy variable. Just for matching with the caller.
     :return: Tensor of shape ``[time, n_1, ..., n_k]``.
     """
-
+    timestep = int(time/dt)
     shape = list(datum.shape)
     datum = np.copy(datum)
     quantile = np.quantile(datum,1-sparsity)
-    s = np.zeros([time, *shape])
+    s = np.zeros([timestep, *shape])
     s[0] = np.where(datum > quantile, np.ones(shape), np.zeros(shape))
     return torch.Tensor(s).byte()
 

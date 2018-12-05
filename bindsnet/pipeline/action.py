@@ -86,9 +86,9 @@ def select_max(output: torch.Tensor, num_action: int) -> int:
     max_indices = (spike_sum==torch.max(spike_sum)).nonzero()
     # If two or more actions have same score, pick randomly.
     if len(max_indices) > 1:
-        action = int(max_indices[np.random.randint(len(max_indices))]/pop_size)
+        action = int(max_indices[np.random.randint(len(max_indices))])
     else:
-        action = int(max_indices[0]/pop_size)
+        action = int(max_indices[0])
 
     return action
 

@@ -272,10 +272,9 @@ class Network:
 
             # Run synapse updates.
             for c in self.connections:
-                if not isinstance(self.connections[c].update_rule, (MSTDP, MSTDPET)):
-                    self.connections[c].update(
-                        mask=masks.get(c, None), learning=self.learning, **kwargs
-                    )
+                self.connections[c].update(
+                    mask=masks.get(c, None), learning=self.learning, **kwargs
+                )
 
             # Get input to all layers.
             inpts.update(self.get_inputs())
@@ -288,10 +287,16 @@ class Network:
             for c in self.connections:
                 self.connections[c].normalize()
 
-    def update(self, reward) -> None:
+    def reward_modulated_update(self, reward, action, num_action) -> None:
+        """
+        Update weights based on reward/RPE value.
+        Currently, only layers that has MSTDPET update rule is updated in this
+        function.
+        """
         for c in self.connections:
-            if not isinstance(self.connections[c].update_rule, (MSTDPET)):
-                self.connections[c].weight_update(reward)
+            if  isinstance(self.connections[c].update_rule, (MSTDPET)):
+                self.connections[c].reward_modulated_update(reward, action,
+                                                            num_action)
 
     def reset_(self) -> None:
         # language=rst

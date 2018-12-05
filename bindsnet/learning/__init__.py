@@ -494,11 +494,11 @@ class MSTDPET(LearningRule):
             )
 
         self.e_trace = torch.zeros(self.source.n, self.target.n)
-        self.tc_e_trace = 0.04
+        self.tc_e_trace = 10.0
         self.p_plus = torch.zeros(self.source.n)
-        self.tc_plus = 0.05
+        self.tc_plus = 20.0
         self.p_minus = torch.zeros(self.target.n)
-        self.tc_minus = 0.05
+        self.tc_minus = 20.0
 
         self.dt = self.connection.dt
 
@@ -526,11 +526,12 @@ class MSTDPET(LearningRule):
         a_minus = kwargs.get('a_minus', -1)
 
         # Get P^+ and P^- values (function of firing traces).
-        self.p_plus = self.p_plus * np.exp(-self.dt * self.tc_plus) + a_plus * source_x
-        self.p_minus = self.p_minus * np.exp(-self.dt * self.tc_minus) + a_minus * target_x
+        self.p_plus = self.p_plus * np.exp(-self.dt / self.tc_plus) + a_plus * source_s
+        self.p_minus = self.p_minus * np.exp(-self.dt / self.tc_minus) + a_minus * target_s
 
         # Calculate value of eligibility trace.
-        self.e_trace += torch.ger(self.p_plus, target_s) + torch.ger(source_s, self.p_minus)
+        self.e_trace = self.e_trace * np.exp(-self.dt / self.tc_e_trace) +\
+            torch.ger(self.p_plus, target_s) + torch.ger(source_s, self.p_minus)
 
     def _conv2d_connection_update(self, **kwargs) -> None:
         # language=rst
@@ -564,8 +565,8 @@ class MSTDPET(LearningRule):
         s_target = self.target.s.permute(1, 2, 3, 0).view(out_channels, -1).float()
 
         # Get P^+ and P^- values (function of firing traces).
-        self.p_plus = self.p_plus * np.exp(-self.dt / self.tc_plus) + a_plus * x_source
-        self.p_minus = self.p_minus * np.exp(-self.dt / self.tc_minus) + a_minus * x_target
+        self.p_plus = self.p_plus * np.exp(-self.dt / self.tc_plus) + a_plus * s_source
+        self.p_minus = self.p_minus * np.exp(-self.dt / self.tc_minus) + a_minus * s_target
 
         # Post-synaptic and pre-synaptic updates.
         post = (self.p_plus @ s_target.t()).view(self.connection.w.size())
@@ -574,9 +575,16 @@ class MSTDPET(LearningRule):
         # Calculate value of eligibility trace.
         self.e_trace = post + pre
 
-        # Compute weight update.
-        self.connection.w += self.nu[0] * reward * self.e_trace
+    def reset(self):
+        self.e_trace = torch.zeros(self.source.n, self.target.n)
+        self.p_plus = torch.zeros(self.source.n)
+        self.p_minus = torch.zeros(self.target.n)
 
-    def weight_update(self, reward:float = None) -> None:
+    def weight_update(self, reward:float = None, action:int = None,
+                      num_action:int = None) -> None:
         # Compute weight update.
-        self.connection.w += self.nu[0] * reward * self.e_trace
+        pop_size = int(self.connection.w.shape[1] / num_action)
+        delta = self.nu[0] * reward * self.e_trace[:,action*pop_size:(action+1)*pop_size]
+        self.connection.w[:,action*pop_size:(action+1)*pop_size] += delta
+        print(f'changed std :{delta.std()}')
+        print(f'w_mean: {self.connection.w.mean()}')

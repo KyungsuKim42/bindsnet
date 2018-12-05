@@ -167,6 +167,12 @@ class Connection(AbstractConnection):
         """
         super().update(**kwargs)
 
+    def reward_modulated_update(self, reward, action, num_action) -> None:
+        """
+        Conduct reward modulated update.
+        """
+        self.update_rule.weight_update(reward, action, num_action)
+
     def normalize(self) -> None:
         # language=rst
         """
@@ -181,6 +187,9 @@ class Connection(AbstractConnection):
         Contains resetting logic for the connection.
         """
         super().reset_()
+        from ..learning import MSTDPET
+        if isinstance(self.update_rule,MSTDPET):
+            self.update_rule.reset()
 
 
 class Conv2dConnection(AbstractConnection):

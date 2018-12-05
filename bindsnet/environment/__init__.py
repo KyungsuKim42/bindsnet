@@ -84,7 +84,6 @@ class DatasetEnvironment(Environment):
         """
         self.dataset = dataset
         self.train = train
-        self.n_action = None
 
         # Keyword arguments.
         self.intensity = kwargs.get('intensity', 1)
@@ -102,6 +101,8 @@ class DatasetEnvironment(Environment):
             self.label_loader = iter(self.labels)
 
         self.env = iter(self.data)
+        self.num_label = float(self.labels.max()) + 1
+        self.label = np.random.randint(self.num_label)
 
     def step(self, a: int = None) -> Tuple[torch.Tensor, int, bool, Dict[str, int]]:
         # language=rst
@@ -111,22 +112,34 @@ class DatasetEnvironment(Environment):
         :param a: There is no interaction of the network the dataset.
         :return: Observation, reward (fixed to 0), done (fixed to False), and information dictionary.
         """
+
+        # Reward for correct answer and punish for wrong answer.
+        print(f'action:{a}, label:{self.label}')
+        if a == self.label:
+            self.reward = 1
+        else:
+            self.reward = -1 / (self.num_label - 1)
+
         try:
             # Attempt to fetch the next observation.
             self.obs = next(self.env)
+            self.label = next(self.label_loader)
         except StopIteration:
             # If out of samples, reload data and label generators.
+            self.data, self.labels = self.dataset.get_train()
             self.env = iter(self.data)
             self.label_loader = iter(self.labels)
             self.obs = next(self.env)
+            self.label = next(self.label_loader)
+
 
         # Preprocess observation.
         self.preprocess()
 
         # Info dictionary contains label of MNIST digit.
-        info = {'label' : next(self.label_loader)}
+        info = {'label' : self.label}
 
-        return self.obs, 0, False, info
+        return self.obs, self.reward, False, info
 
     def reset(self) -> None:
         # language=rst

@@ -52,6 +52,8 @@ class Agent:
         self.time = time
         self.dt = dt
         self.timestep = int(time/dt)
+        assert network.layers[output_name].n % num_action == 0, \
+            "Number of "
 
         self.max_prob = kwargs.get('max_prob', 1.0)
         self.epsilon = kwargs.get('epsilon',0.0)
@@ -68,6 +70,13 @@ class Agent:
         self.voltage_record = {}
         self.threshold_value = {}
 
+    def reward_modulated_update(self,reward, action):
+        """
+        Update weights based on reward/RPE value.
+        Currently, only layers that has MSTDPET update rule is updated in this
+        function.
+        """
+        self.network.reward_modulated_update(reward, action, self.num_action)
 
     def step(self, obs, reward):
 
@@ -83,6 +92,7 @@ class Agent:
 
         # Epsilon Greedy
         if self.epsilon is not None:
+            print(f'Epsilon: {self.epsilon}')
             if np.random.rand() < self.epsilon:
                 self.action = np.random.randint(self.num_action)
             self.epsilon *= self.epsilon_decay
