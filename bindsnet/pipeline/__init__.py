@@ -63,7 +63,7 @@ class Pipeline:
         self.obs_im, self.obs_ax = None, None
         self.reward_im, self.reward_ax = None, None
         self.accumulated_reward = 0
-        self.reward_list = []
+        self.reward_list = [0]
         self.action = None
 
         # Setting kwargs.
@@ -141,11 +141,14 @@ class Pipeline:
         # Plot relevant data.
         if self.plot_interval is not None and \
                 self.iteration % self.plot_interval == 0:
-            self.plot_data()
+            #self.plot_data()
             #self.plot_connection()
             if self.iteration > len(self.history) * self.delta:
                 self.plot_obs()
 
+        self.reward_list += [self.reward_list[-1]+self.reward]
+        print(self.reward_list[-1])
+        #self.plot_reward()
 
         self.iteration += 1
         # Store frame of history and encode the inputs.
@@ -156,9 +159,6 @@ class Pipeline:
         if self.done:
             self.iteration = 0
             self.episode += 1
-            self.reward_list.append(self.accumulated_reward)
-            self.accumulated_reward = 0
-            self.plot_reward()
 
     def set_spike_data(self) -> None:
         # language=rst
@@ -208,10 +208,10 @@ class Pipeline:
             reward_array = np.array(self.reward_list)
             y_min = reward_array.min()
             y_max = reward_array.max()
-            self.reward_ax.set_xlim(left=0, right=self.episode)
             self.reward_ax.set_ylim(bottom=y_min, top=y_max)
-            self.reward_plot.set_data(range(self.episode), self.reward_list)
-
+            self.reward_ax.plot(self.reward_list,color='b')
+        plt.pause(1e-8)
+        plt.show()
 
     def plot_data(self) -> None:
         # language=rst

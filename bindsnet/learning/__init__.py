@@ -587,4 +587,5 @@ class MSTDPET(LearningRule):
         delta = self.nu[0] * reward * self.e_trace[:,action*pop_size:(action+1)*pop_size]
         self.connection.w[:,action*pop_size:(action+1)*pop_size] += delta
         print(f'changed std :{delta.std()}')
-        print(f'w_mean: {self.connection.w.mean()}')
+        print(f'w_min: {torch.sum(self.connection.w<=self.connection.wmin)}')
+        print(f'w_max: {torch.sum(self.connection.w>=self.connection.wmax)}')

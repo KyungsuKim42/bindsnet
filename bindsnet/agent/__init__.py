@@ -70,13 +70,6 @@ class Agent:
         self.voltage_record = {}
         self.threshold_value = {}
 
-    def reward_modulated_update(self,reward, action):
-        """
-        Update weights based on reward/RPE value.
-        Currently, only layers that has MSTDPET update rule is updated in this
-        function.
-        """
-        self.network.reward_modulated_update(reward, action, self.num_action)
 
     def step(self, obs, reward):
 
@@ -99,6 +92,13 @@ class Agent:
 
         return self.action
 
+    def reward_modulated_update(self,reward, action):
+        """
+        Update weights based on reward/RPE value.
+        Currently, only layers that has MSTDPET update rule is updated in this
+        function.
+        """
+        self.network.reward_modulated_update(reward, action, self.num_action)
 
     def update(self, reward):
         # If the agent has critic layer, calculate reward prediction error.

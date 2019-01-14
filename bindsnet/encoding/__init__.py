@@ -55,7 +55,6 @@ def bernoulli(datum: torch.Tensor, time: Optional[int] = None, **kwargs) -> torc
     # Normalize inputs and rescale (spike probability proportional to normalized intensity).
     if datum.max() > 1.0:
         datum /= datum.max()
-
     # Make spike data from Bernoulli sampling.
     if time is None:
         spikes = torch.bernoulli(max_prob * datum)
@@ -63,6 +62,38 @@ def bernoulli(datum: torch.Tensor, time: Optional[int] = None, **kwargs) -> torc
     else:
         spikes = torch.bernoulli(max_prob * datum.repeat([time, 1]))
         spikes = spikes.view(time, *shape)
+
+    return spikes.byte()
+
+def bernoulli_single(datum: torch.Tensor, time: Optional[int] = None, **kwargs) -> torch.Tensor:
+    # language=rst
+    """
+
+    :param datum: Generates Bernoulli-distributed spike trains based on input intensity. Inputs must be non-negative.
+                  Spikes correspond to successful Bernoulli trials, with success probability equal to (normalized in
+                  [0, 1]) input value.
+    :param time: Tensor of shape ``[n_1, ..., n_k]``.
+    :param dt: Simulation time step.
+    :return: Tensor of shape ``[time, n_1, ..., n_k]`` of Bernoulli-distributed spikes.
+
+    Keyword arguments:
+
+    :param float max_prob: Maximum probability of spike per Bernoulli trial.
+    """
+    # Setting kwargs.
+    max_prob = kwargs.get('max_prob', 1.0)
+    dt = kwargs.get('dt', 1.0)
+    assert 0 <= max_prob <= 1, 'Maximum firing probability must be in range [0, 1]'
+
+    shape, size = datum.shape, datum.numel()
+    datum = datum.view(-1)
+    time = int(time / dt)
+    spikes = torch.zeros([time,*shape])
+    # Normalize inputs and rescale (spike probability proportional to normalized intensity).
+    if datum.max() > 1.0:
+        datum /= datum.max()
+    # Make spike data from Bernoulli sampling.
+    spikes[0,:] = torch.bernoulli(max_prob * datum)
 
     return spikes.byte()
 
