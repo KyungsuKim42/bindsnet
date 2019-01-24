@@ -81,7 +81,8 @@ class Network:
         plt.tight_layout(); plt.show()
     """
 
-    def __init__(self, dt: float = 1.0, is_actor_critic=False, critic_coeff=1.0, critic_bias=0.0) -> None:
+    def __init__(self, dt: float = 1.0, is_actor_critic=False, critic_coeff=1.0,
+        critic_bias=0.0, device=None) -> None:
         # language=rst
         """
         Initializes network object.
@@ -99,6 +100,7 @@ class Network:
         self.connections = {}
         self.monitors = {}
         self.learning = True
+        self.device=device
 
         self.is_actor_critic = is_actor_critic
         self.critic_coeff = critic_coeff
@@ -192,7 +194,7 @@ class Network:
             target = self.connections[c].target
 
             if not c[1] in inpts:
-                inpts[c[1]] = torch.zeros(target.shape)
+                inpts[c[1]] = torch.zeros(target.shape, device=self.device)
 
             # Add to input: source's spikes multiplied by connection weights.
             inpts[c[1]] += self.connections[c].compute(source.s)

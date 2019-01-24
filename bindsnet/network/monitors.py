@@ -54,7 +54,8 @@ class Monitor(AbstractMonitor):
     """
     Records state variables of interest.
     """
-    def __init__(self, obj: Union[Nodes, AbstractConnection], state_vars: Iterable[str], time: Optional[int]=None):
+    def __init__(self, obj: Union[Nodes, AbstractConnection],
+            state_vars: Iterable[str], time: Optional[int]=None, device=None):
         # language=rst
         """
         Constructs a ``Monitor`` object.
@@ -68,6 +69,7 @@ class Monitor(AbstractMonitor):
         self.obj = obj
         self.state_vars = state_vars
         self.time = time
+        self.device = device
 
         self.record_length = 0
         # If no simulation time is specified, specify 0-dimensional recordings.
@@ -76,7 +78,8 @@ class Monitor(AbstractMonitor):
 
         # If simulation time is specified, pre-allocate recordings in memory for speed.
         else:
-            self.recording = {var: torch.zeros(*self.obj.__dict__[var].size(), self.time) for var in self.state_vars}
+            self.recording = {var: torch.zeros(*self.obj.__dict__[var].size(),
+                self.time, device=self.device) for var in self.state_vars}
     def get(self, var: str) -> torch.Tensor:
         # language=rst
         """
@@ -116,7 +119,8 @@ class Monitor(AbstractMonitor):
 
         # If simulation time is specified, pre-allocate recordings in memory for speed.
         else:
-            self.recording = {v: torch.zeros(*self.obj.__dict__[v].size(), self.time) for v in self.state_vars}
+            self.recording = {v: torch.zeros(*self.obj.__dict__[v].size(), self.time,
+                device=self.device) for v in self.state_vars}
 
 
 class NetworkMonitor(AbstractMonitor):
@@ -266,8 +270,10 @@ class NetworkMonitor(AbstractMonitor):
             for v in self.state_vars:
                 for l in self.layers:
                     if v in self.network.layers[l].__dict__:
-                        self.recording[l][v] = torch.zeros(self.network.layers[l].n, self.time)
+                        self.recording[l][v] = torch.zeros(self.network.layers[l].n,
+                            self.time, device=self.device)
 
                 for c in self.connections:
                     if v in self.network.connections[c].__dict__:
-                        self.recording[c][v] = torch.zeros(*self.network.connections[c].w.size(), self.time)
+                        self.recording[c][v] = torch.zeros(*self.network.connections[c].w.size(),
+                            self.time, device=self.device)

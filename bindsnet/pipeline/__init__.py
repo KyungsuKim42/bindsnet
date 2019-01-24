@@ -148,7 +148,7 @@ class Pipeline:
 
         self.reward_list += [self.reward_list[-1]+self.reward]
         print(self.reward_list[-1])
-        #self.plot_reward()
+        self.plot_reward()
 
         self.iteration += 1
         # Store frame of history and encode the inputs.
@@ -208,7 +208,7 @@ class Pipeline:
             reward_array = np.array(self.reward_list)
             y_min = reward_array.min()
             y_max = reward_array.max()
-            self.reward_ax.set_ylim(bottom=y_min, top=y_max)
+            self.reward_ax.set_ylim(bottom=y_min, top=100)
             self.reward_ax.plot(self.reward_list,color='b')
         plt.pause(1e-8)
         plt.show()

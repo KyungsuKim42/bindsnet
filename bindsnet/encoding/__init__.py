@@ -44,14 +44,12 @@ def bernoulli(datum: torch.Tensor, time: Optional[int] = None, **kwargs) -> torc
     :param float max_prob: Maximum probability of spike per Bernoulli trial.
     """
     # Setting kwargs.
-    max_prob = kwargs.get('max_prob', 1.0)
+    rate = kwargs.get('rate', 1.0)
     dt = kwargs.get('dt', 1.0)
-    assert 0 <= max_prob <= 1, 'Maximum firing probability must be in range [0, 1]'
-
     shape, size = datum.shape, datum.numel()
     datum = datum.view(-1)
     time = int(time / dt)
-
+    max_prob = min(rate * (dt/1000.0), 1.0)
     # Normalize inputs and rescale (spike probability proportional to normalized intensity).
     if datum.max() > 1.0:
         datum /= datum.max()
