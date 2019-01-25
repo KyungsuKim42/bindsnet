@@ -577,5 +577,17 @@ class MSTDPET(LearningRule):
         # Calculate value of eligibility trace.
         self.e_trace[update != 0] = update[update != 0]
 
+    def reset(self):
+        self.e_trace = torch.zeros(self.source.n, self.target.n)
+        self.p_plus = torch.zeros(self.source.n)
+        self.p_minus = torch.zeros(self.target.n)
+
+    def weight_update(self, reward:float = None, action:int = None,
+                      num_action:int = None) -> None:
         # Compute weight update.
-        self.connection.w += self.nu[0] * reward * self.e_trace
+        pop_size = int(self.connection.w.shape[1] / num_action)
+        delta = self.nu[0] * reward * self.e_trace[:,action*pop_size:(action+1)*pop_size]
+        self.connection.w[:,action*pop_size:(action+1)*pop_size] += delta
+        print(f'changed std :{delta.std()}')
+        print(f'w_min: {torch.sum(self.connection.w<=self.connection.wmin)}')
+        print(f'w_max: {torch.sum(self.connection.w>=self.connection.wmax)}')

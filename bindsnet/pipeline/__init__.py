@@ -5,7 +5,7 @@ import numpy as np
 
 from typing import Callable, Optional
 
-from ..network import Network
+from ..agent import Agent
 from ..encoding import bernoulli
 from ..network.nodes import Input, AbstractInput
 from ..environment import Environment
@@ -26,17 +26,15 @@ class Pipeline:
     action.
     """
 
-    def __init__(self, network: Network, environment: Environment, encoding: Callable = bernoulli,
-                 action_function: Optional[Callable] = None, enable_history: Optional[bool] = False,
-                 **kwargs):
+    def __init__(
+            self, agent: Agent, environment: Environment,
+            enable_history: Optional[bool] = False, **kwargs):
         # language=rst
         """
         Initializes the pipeline.
 
-        :param network: Arbitrary network object.
+        :param agent: Arbitrary agent object.
         :param environment: Arbitrary environment.
-        :param encoding: Function to encode observations into spike trains.
-        :param action_function: Function to convert network outputs into environment inputs.
         :param enable_history: Enable history functionality.
 
         Keyword arguments:
@@ -44,7 +42,6 @@ class Pipeline:
         :param int plot_interval: Interval to update plots.
         :param str save_dir: Directory to save network object to.
         :param int print_interval: Interval to print text output.
-        :param int time: Time input is presented for to the network.
         :param int history: Number of observations to keep track of.
         :param int delta: Step size to save observations in history.
         :param bool render_interval: Interval to render the environment.
@@ -54,10 +51,8 @@ class Pipeline:
         :param str plot_type: Type of plotting ('color' or 'line').
         :param int reward_delay: How many iterations to delay delivery of reward.
         """
-        self.network = network
+        self.agent = agent
         self.env = environment
-        self.encoding = encoding
-        self.action_function = action_function
         self.enable_history = enable_history
 
         self.episode = 0
@@ -65,15 +60,15 @@ class Pipeline:
         self.history_index = 1
         self.s_ims, self.s_axes = None, None
         self.v_ims, self.v_axes = None, None
+        self.w_axes = None
         self.obs_im, self.obs_ax = None, None
         self.reward_im, self.reward_ax = None, None
         self.accumulated_reward = 0
-        self.reward_list = []
+        self.reward_list = [0]
+        self.action = None
 
         # Setting kwargs.
-        self.time = kwargs.get('time', 1)
         self.delta = kwargs.get('delta', 1)
-        self.output = kwargs.get('output', None)
         self.save_dir = kwargs.get('save_dir', 'network.pt')
         self.plot_interval = kwargs.get('plot_interval', None)
         self.save_interval = kwargs.get('save_interval', None)
@@ -84,25 +79,13 @@ class Pipeline:
         self.plot_type = kwargs.get('plot_type', 'color')
         self.reward_delay = kwargs.get('reward_delay', None)
 
-        self.dt = network.dt
-        self.timestep = int(self.time / self.dt)
-
         if self.history_length is not None and self.delta is not None:
             self.history = {i: torch.Tensor() for i in range(1, self.history_length * self.delta + 1, self.delta)}
         else:
             self.history = {}
 
-        if self.plot_interval is not None:
-            for l in self.network.layers:
-                self.network.add_monitor(Monitor(self.network.layers[l], 's', int(self.plot_length * self.plot_interval * self.timestep)),
-                                         name=f'{l}_spikes')
-                if 'v' in self.network.layers[l].__dict__:
-                    self.network.add_monitor(Monitor(self.network.layers[l], 'v', int(self.plot_length * self.plot_interval * self.timestep)),
-                                             name=f'{l}_voltages')
-
-            self.spike_record = {l: torch.Tensor().byte() for l in self.network.layers}
-            self.set_spike_data()
-            self.plot_data()
+        # Add monitors to each layer of the network.
+        self.agent.set_monitor(self.plot_length, self.plot_interval)
 
         if self.reward_delay is not None:
             assert self.reward_delay > 0
@@ -116,6 +99,7 @@ class Pipeline:
         self.obs = None
         self.reward = None
         self.done = None
+        self.action = np.random.randint(self.agent.num_action)
 
         self.voltage_record = None
 
@@ -143,17 +127,30 @@ class Pipeline:
 
         if self.save_interval is not None and self.iteration % self.save_interval == 0:
             print(f'Saving network to {self.save_dir}')
-            self.network.save(self.save_dir)
+            self.agent.network.save(self.save_dir)
 
+
+        # Run a step of the environment.
+        self.obs, self.reward, self.done, info = self.env.step(self.action)
+        print(self.reward)
         # Render game.
         if self.render_interval is not None and self.iteration % self.render_interval == 0:
             self.env.render()
+        # Update weights based on reward-modulated learning rules.
+        self.agent.reward_modulated_update(self.reward, self.action)
+        # Reset eligibility traces and other update-related traces
+        self.agent.reset()
+        # Run a step for calculating the next action.
+        # Should I remove self.reward?
+        self.action = self.agent.step(self.obs, self.reward)
 
-        # Choose action based on output neuron spiking.
-        if self.action_function is not None:
-            a = self.action_function(self, output=self.output)
-        else:
-            a = None
+        # Plot relevant data.
+        if self.plot_interval is not None and \
+                self.iteration % self.plot_interval == 0:
+            #self.plot_data()
+            #self.plot_connection()
+            if self.iteration > len(self.history) * self.delta:
+                self.plot_obs()
 
         # Run a step of the environment.
         self.obs, reward, self.done, info = self.env.step(a)
@@ -164,6 +161,7 @@ class Pipeline:
         else:
             self.reward = reward
 
+        self.iteration += 1
         # Store frame of history and encode the inputs.
         if self.enable_history and len(self.history) > 0:
             self.update_history()
@@ -188,9 +186,28 @@ class Pipeline:
         if self.done:
             self.iteration = 0
             self.episode += 1
-            self.reward_list.append(self.accumulated_reward)
-            self.accumulated_reward = 0
-            self.plot_reward()
+
+    def set_spike_data(self) -> None:
+        # language=rst
+        """
+        Get the spike data from all layers in the pipeline's network.
+        """
+        self.spike_record = {l: self.agent.network.monitors[f'{l}_spikes'].get('s')\
+            for l in self.agent.network.layers}
+
+    def set_voltage_data(self) -> None:
+        # language=rst
+        """
+        Get the voltage data and threshold value from all applicable layers in
+            the pipeline's network.
+        """
+        self.voltage_record = {}
+        self.threshold_value = {}
+        for l in self.agent.network.layers:
+            if 'v' in self.agent.network.layers[l].__dict__:
+                self.voltage_record[l] = self.agent.network.monitors[f'{l}_voltages'].get('v')
+            if 'thresh' in self.agent.network.layers[l].__dict__:
+                self.threshold_value[l] = self.agent.network.layers[l].thresh
 
     def plot_obs(self) -> None:
         # language=rst
@@ -268,9 +285,10 @@ class Pipeline:
     def update_history(self) -> None:
         # language=rst
         """
-        Updates the observations inside history by performing subtraction from  most recent observation and the sum of
-        previous observations. If there are not enough observations to take a difference from, simply store the
-        observation without any differencing.
+        Updates the observations inside history by performing subtraction from
+        most recent observation and the sum of previous observations.
+        If there are not enough observations to take a difference from, simply
+        store the observation without any differencing.
         """
         # Recording initial observations
         if self.iteration < len(self.history) * self.delta:
@@ -308,6 +326,6 @@ class Pipeline:
         Reset the pipeline.
         """
         self.env.reset()
-        self.network.reset_()
+        self.agent.reset()
         self.iteration = 0
         self.history = {i: torch.Tensor() for i in self.history}

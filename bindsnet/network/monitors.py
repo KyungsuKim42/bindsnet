@@ -54,7 +54,9 @@ class Monitor(AbstractMonitor):
     """
     Records state variables of interest.
     """
-    def __init__(self, obj: Union[Nodes, AbstractConnection], state_vars: Iterable[str], time: Optional[int]=None):
+    def __init__(self, obj: Union[Nodes, AbstractConnection],
+            state_vars: Iterable[str], time: Optional[int]=None, device=None,
+            batch=False):
         # language=rst
         """
         Constructs a ``Monitor`` object.
@@ -62,12 +64,17 @@ class Monitor(AbstractMonitor):
         :param obj: An object to record state variables from during network simulation.
         :param state_vars: Iterable of strings indicating names of state variables to record.
         :param time: If not ``None``, pre-allocate memory for state variable recording.
+        :param device: Which device to use.
+        :param batch: If batch-learning enabled or not. If True, then only
+            record the first sample from the batch.
         """
         super().__init__()
 
         self.obj = obj
         self.state_vars = state_vars
         self.time = time
+        self.device = device
+        self.batch = batch
 
         # If no simulation time is specified, specify 0-dimensional recordings.
         if self.time is None:
@@ -99,13 +106,22 @@ class Monitor(AbstractMonitor):
         """
         if self.time is None:
             for v in self.state_vars:
-                data = self.obj.__dict__[v].unsqueeze(-1)
-                self.recording[v] = torch.cat([self.recording[v].type(data.type()), data], -1)
+                if batch:
+                    data = self.obj.__dict__[v][0].unsqueeze(-1).float()
+                else:
+                    data = self.obj.__dict__[v].unsqueeze(-1).float()
+                self.recording[v] = torch.cat([self.recording[v], data], -1)
+            self.record_length += 1
         else:
             for v in self.state_vars:
-                # Remove the oldest data and concatenate new data
-                data = self.obj.__dict__[v].unsqueeze(-1)
-                self.recording[v] = torch.cat([self.recording[v][..., 1:].type(data.type()), data], -1)
+                if batch:
+                    data = self.obj.__dict__[v][0].unsqueeze(-1).float()
+                else:
+                    data = self.obj.__dict__[v].unsqueeze(-1).float()
+                if self.time is None or self.record_length==self.time:
+
+                else:
+                    self.recording[v] = torch.cat([self.recording[v][...,1:], data], -1)
 
     def reset_(self) -> None:
         # language=rst

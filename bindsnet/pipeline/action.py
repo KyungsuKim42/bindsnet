@@ -42,24 +42,22 @@ def select_multinomial(pipeline: Pipeline, **kwargs) -> int:
     return action
 
 
-def select_softmax(pipeline: Pipeline, **kwargs) -> int:
+def select_softmax(output, num_action) -> int:
     # language=rst
     """
     Selects an action using softmax function based on spiking from a network layer.
 
-    :param pipeline: Pipeline with environment that has an integer action space.
+    :param output: Output spike_train
+    :param num_action: Number of actions
     :return: Action sampled from softmax over activity of similarly-sized output layer.
 
-    Keyword arguments:
-
-    :param str output: Name of output layer whose activity to base action selection on.
     """
     try:
         output = kwargs['output']
     except KeyError:
         raise KeyError('select_softmax() requires an "output" layer argument.')
 
-    assert pipeline.network.layers[output].n == pipeline.env.action_space.n, \
+    assert output.n == num_action, \
         'Output layer size not equal to size of action space.'
 
     assert hasattr(pipeline, 'spike_record'), 'Pipeline has not attribute named: spike_record.'
@@ -75,6 +73,26 @@ def select_softmax(pipeline: Pipeline, **kwargs) -> int:
 
     return action
 
+def select_max(output: torch.Tensor, num_action: int) -> int:
+    """
+    Selects an action that has the most number of spikes.
+    If the number of the spikes are same, pick randomly.
+    """
+    num_spike = torch.sum(output, dim=1)
+    assert num_spike.shape[0] % num_action == 0, \
+        'Output layer size not equal to size of action space.'
+    pop_size = int(num_spike.shape[0] / num_action)
+    spike_sum = torch.Tensor([num_spike[(i * pop_size):(i * pop_size) + pop_size
+                          ].sum() for i in range(num_action)])
+
+    max_indices = (spike_sum==torch.max(spike_sum)).nonzero()
+    # If two or more actions have same score, pick randomly.
+    if len(max_indices) > 1:
+        action = int(max_indices[np.random.randint(len(max_indices))])
+    else:
+        action = int(max_indices[0])
+
+    return action
 
 def select_random(pipeline: Pipeline, **kwargs) -> int:
     # language=rst

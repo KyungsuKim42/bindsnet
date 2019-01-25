@@ -5,6 +5,7 @@ from typing import Dict
 from .nodes import AbstractInput, Nodes
 from .topology import AbstractConnection
 from .monitors import AbstractMonitor
+from ..learning import MSTDP, MSTDPET
 
 __all__ = [
     'load_network', 'Network', 'nodes', 'monitors', 'topology'
@@ -85,7 +86,6 @@ class Network:
         # language=rst
         """
         Initializes network object.
-
         :param dt: Simulation timestep. All other objects' time constants are relative to this value.
         :param learning: Whether to allow connection updates. True by default.
         """
@@ -183,7 +183,7 @@ class Network:
             target = self.connections[c].target
 
             if not c[1] in inpts:
-                inpts[c[1]] = torch.zeros(target.shape)
+                inpts[c[1]] = torch.zeros(target.shape, device=self.device)
 
             # Add to input: source's spikes multiplied by connection weights.
             inpts[c[1]] += self.connections[c].compute(source.s)
@@ -287,9 +287,9 @@ class Network:
             for m in self.monitors:
                 self.monitors[m].record()
 
-        # Re-normalize connections.
-        for c in self.connections:
-            self.connections[c].normalize()
+            # Re-normalize connections.
+            for c in self.connections:
+                self.connections[c].normalize()
 
     def reset_(self) -> None:
         # language=rst

@@ -25,6 +25,8 @@ class AbstractConnection(ABC):
         :param target: A layer of nodes to which the connection connects.
         :param nu: Learning rate for both pre- and post-synaptic events.
         :param weight_decay: Constant multiple to decay weights by on each iteration.
+        :param dt: Time length of single timestep.
+        :param device: Device to use.
 
         Keyword arguments:
 
@@ -38,11 +40,13 @@ class AbstractConnection(ABC):
         self.target = target
         self.nu = nu
         self.weight_decay = weight_decay
+        self.dt = dt
+        self.device = device
 
         assert isinstance(source, Nodes), 'Source is not a Nodes object'
         assert isinstance(target, Nodes), 'Target is not a Nodes object'
 
-        from ..learning import NoOp
+        from ..learning import NoOp, MSTDP, MSTDPET
 
         self.update_rule = kwargs.get('update_rule', NoOp)
         self.wmin = kwargs.get('wmin', None)
@@ -52,6 +56,8 @@ class AbstractConnection(ABC):
 
         if self.update_rule is None:
             self.update_rule = NoOp
+
+        self.update_done = False
 
         self.a_pre = 0.0
 
@@ -108,7 +114,7 @@ class Connection(AbstractConnection):
     """
 
     def __init__(self, source: Nodes, target: Nodes, nu: Optional[Union[float, Sequence[float]]] = None,
-                 weight_decay: float = 0.0, **kwargs) -> None:
+                 weight_decay: float = 0.0, dt:float = 1.0, device=None, **kwargs) -> None:
         # language=rst
         """
         Instantiates a :code:`Connection` object.
@@ -117,6 +123,8 @@ class Connection(AbstractConnection):
         :param target: A layer of nodes to which the connection connects.
         :param nu: Learning rate for both pre- and post-synaptic events.
         :param weight_decay: Constant multiple to decay weights by on each iteration.
+        :param dt: Time length of single timestep.
+        :param device: Device to use.
 
         Keyword arguments:
 
@@ -127,19 +135,20 @@ class Connection(AbstractConnection):
         :param float wmax: Maximum allowed value on the connection weights.
         :param float norm: Total weight per target neuron normalization constant.
         """
-        super().__init__(source, target, nu, weight_decay, **kwargs)
+        super().__init__(source, target, nu, weight_decay, dt, device, **kwargs)
 
         self.w = kwargs.get('w', None)
         if self.w is None:
             if self.wmin is None or self.wmax is None:
-                self.w = torch.rand(source.n, target.n)
+                self.w = torch.rand(source.n, target.n, device=self.device)
             elif self.wmin is not None and self.wmax is not None:
-                self.w = self.wmin + torch.rand(source.n, target.n) * (self.wmax - self.wmin)
+                self.w = self.wmin + torch.rand(source.n, target.n, device=self.device) * (self.wmax - self.wmin)
         else:
             if self.wmin is not None and self.wmax is not None:
                 self.w = torch.clamp(self.w, self.wmin, self.wmax)
 
-        self.b = kwargs.get('b', torch.zeros(target.n))
+        self.b = kwargs.get('b', torch.zeros(target.n, device=self.device))
+
 
     def compute(self, s: torch.Tensor) -> torch.Tensor:
         # language=rst
@@ -160,6 +169,12 @@ class Connection(AbstractConnection):
         """
         super().update(**kwargs)
 
+    def reward_modulated_update(self, reward, action, num_action) -> None:
+        """
+        Conduct reward modulated update.
+        """
+        self.update_rule.weight_update(reward, action, num_action)
+
     def normalize(self) -> None:
         # language=rst
         """
@@ -174,6 +189,9 @@ class Connection(AbstractConnection):
         Contains resetting logic for the connection.
         """
         super().reset_()
+        from ..learning import MSTDPET
+        if isinstance(self.update_rule,MSTDPET):
+            self.update_rule.reset()
 
 
 class Conv2dConnection(AbstractConnection):

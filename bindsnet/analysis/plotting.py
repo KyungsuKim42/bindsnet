@@ -90,22 +90,26 @@ def plot_spikes(spikes: Dict[str, torch.Tensor], time: Optional[Tuple[int, int]]
         ims = []
         if n_subplots == 1:
             for datum in spikes.items():
-                ims.append(axes.imshow(spikes[datum[0]][n_neurons[datum[0]][0]:n_neurons[datum[0]][1],
-                                       time[0]:time[1]], cmap='binary'))
+                temp = datum[1].nonzero().cpu().numpy().T
+                if len(temp) !=0:
+                    ims.append(axes.plot(temp[1], temp[0], 'k.'))
                 args = (datum[0], n_neurons[datum[0]][0], n_neurons[datum[0]][1], time[0], time[1])
-                plt.title('%s spikes for neurons (%d - %d) from t = %d to %d ' % args)
-                plt.xlabel('Simulation time'); plt.ylabel('Neuron index')
+                axes.set_title('%s spikes for neurons (%d - %d) from t = %d to %d ' % args)
                 axes.set_aspect('auto')
         else:
             for i, datum in enumerate(spikes.items()):
-                ims.append(axes[i].imshow(datum[1][n_neurons[datum[0]][0]:n_neurons[datum[0]][1],
-                                          time[0]:time[1]], cmap='binary'))
+                axes[i].set_xlim([time[0],time[1]])
+                axes[i].set_ylim([n_neurons[datum[0]][0], n_neurons[datum[0]][1]])
+                temp = datum[1].nonzero().cpu().numpy().T
+                if len(temp) !=0:
+                    ims.append(axes[i].plot(temp[1], temp[0], 'k.')[0])
+                else:
+                    ims.append(axes[i].plot([-1],[-1], 'k.')[0])
                 args = (datum[0], n_neurons[datum[0]][0], n_neurons[datum[0]][1], time[0], time[1])
                 axes[i].set_title('%s spikes for neurons (%d - %d) from t = %d to %d ' % args)
             for ax in axes:
                 ax.set_aspect('auto')
 
-        plt.setp(axes, xticks=[], yticks=[], xlabel='Simulation time', ylabel='Neuron index')
         plt.tight_layout()
     else:
         if n_subplots == 1:
@@ -116,8 +120,15 @@ def plot_spikes(spikes: Dict[str, torch.Tensor], time: Optional[Tuple[int, int]]
                 axes.set_title('%s spikes for neurons (%d - %d) from t = %d to %d ' % args)
         else:
             for i, datum in enumerate(spikes.items()):
-                ims[i].set_data(datum[1][n_neurons[datum[0]][0]:n_neurons[datum[0]][1], time[0]:time[1]])
-                ims[i].autoscale()
+                axes[i].set_xlim([time[0],time[1]])
+                axes[i].set_ylim([n_neurons[datum[0]][0], n_neurons[datum[0]][1]])
+
+                temp = datum[1].nonzero().cpu().numpy().T
+                if len(temp) !=0:
+                    ims[i].set_data(temp[1], temp[0])
+                else:
+                    ims[i].set_data([-1],[-1])
+
                 args = (datum[0], n_neurons[datum[0]][0], n_neurons[datum[0]][1], time[0], time[1])
                 axes[i].set_title('%s spikes for neurons (%d - %d) from t = %d to %d ' % args)
 
@@ -380,7 +391,6 @@ def plot_voltages(voltages: Dict[str, torch.Tensor], ims: Optional[List[AxesImag
             for v in voltages.items():
                 if plot_type == 'line':
                     ims.append(axes.plot(v[1][n_neurons[v[0]][0]:n_neurons[v[0]][1], time[0]:time[1]].cpu().numpy().T))
-
                     if threshold is not None:
                         ims.append(axes.axhline(y=threshold[v[0]], c='r', linestyle='--'))
                 else:
