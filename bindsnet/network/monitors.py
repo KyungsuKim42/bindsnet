@@ -55,7 +55,8 @@ class Monitor(AbstractMonitor):
     Records state variables of interest.
     """
     def __init__(self, obj: Union[Nodes, AbstractConnection],
-            state_vars: Iterable[str], time: Optional[int]=None, device=None):
+            state_vars: Iterable[str], time: Optional[int]=None, device=None,
+            batch=False):
         # language=rst
         """
         Constructs a ``Monitor`` object.
@@ -63,6 +64,9 @@ class Monitor(AbstractMonitor):
         :param obj: An object to record state variables from during network simulation.
         :param state_vars: Iterable of strings indicating names of state variables to record.
         :param time: If not ``None``, pre-allocate memory for state variable recording.
+        :param device: Which device to use.
+        :param batch: If batch-learning enabled or not. If True, then only
+            record the first sample from the batch.
         """
         super().__init__()
 
@@ -70,6 +74,7 @@ class Monitor(AbstractMonitor):
         self.state_vars = state_vars
         self.time = time
         self.device = device
+        self.batch = batch
 
         self.record_length = 0
         # If no simulation time is specified, specify 0-dimensional recordings.
@@ -98,14 +103,22 @@ class Monitor(AbstractMonitor):
         """
         if self.time is None or self.record_length==self.time:
             for v in self.state_vars:
-                data = self.obj.__dict__[v].unsqueeze(-1).float()
+                if batch:
+                    data = self.obj.__dict__[v][0].unsqueeze(-1).float()
+                else:
+                    data = self.obj.__dict__[v].unsqueeze(-1).float()
                 self.recording[v] = torch.cat([self.recording[v], data], -1)
             self.record_length += 1
         else:
             for v in self.state_vars:
-                # Remove the oldest data and concatenate new data
-                data = self.obj.__dict__[v].unsqueeze(-1).float()
-                self.recording[v] = torch.cat([self.recording[v][...,1:], data], -1)
+                if batch:
+                    data = self.obj.__dict__[v][0].unsqueeze(-1).float()
+                else:
+                    data = self.obj.__dict__[v].unsqueeze(-1).float()
+                if self.time is None or self.record_length==self.time:
+
+                else:
+                    self.recording[v] = torch.cat([self.recording[v][...,1:], data], -1)
 
     def reset_(self) -> None:
         # language=rst
@@ -119,8 +132,7 @@ class Monitor(AbstractMonitor):
 
         # If simulation time is specified, pre-allocate recordings in memory for speed.
         else:
-            self.recording = {v: torch.zeros(*self.obj.__dict__[v].size(), self.time,
-                device=self.device) for v in self.state_vars}
+            self.recording = {v: torch.zeros(*self.obj.__dict__[v].size(), self.time) for v in self.state_vars}
 
 
 class NetworkMonitor(AbstractMonitor):
@@ -270,10 +282,8 @@ class NetworkMonitor(AbstractMonitor):
             for v in self.state_vars:
                 for l in self.layers:
                     if v in self.network.layers[l].__dict__:
-                        self.recording[l][v] = torch.zeros(self.network.layers[l].n,
-                            self.time, device=self.device)
+                        self.recording[l][v] = torch.zeros(self.network.layers[l].n, self.time)
 
                 for c in self.connections:
                     if v in self.network.connections[c].__dict__:
-                        self.recording[c][v] = torch.zeros(*self.network.connections[c].w.size(),
-                            self.time, device=self.device)
+                        self.recording[c][v] = torch.zeros(*self.network.connections[c].w.size(), self.time)

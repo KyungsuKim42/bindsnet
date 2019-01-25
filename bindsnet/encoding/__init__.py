@@ -58,7 +58,7 @@ def bernoulli(datum: torch.Tensor, time: Optional[int] = None, **kwargs) -> torc
         spikes = torch.bernoulli(max_prob * datum)
         spikes = spikes.view(*shape)
     else:
-        spikes = torch.bernoulli(max_prob * datum.repeat([time, 1]))
+        spikes= torch.bernoulli(max_prob * datum.repeat([time, 1]))
         spikes = spikes.view(time, *shape)
 
     return spikes.byte()

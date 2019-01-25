@@ -90,7 +90,7 @@ def plot_spikes(spikes: Dict[str, torch.Tensor], time: Optional[Tuple[int, int]]
         ims = []
         if n_subplots == 1:
             for datum in spikes.items():
-                temp = datum[1].nonzero().numpy().T
+                temp = datum[1].nonzero().cpu().numpy().T
                 if len(temp) !=0:
                     ims.append(axes.plot(temp[1], temp[0], 'k.'))
                 args = (datum[0], n_neurons[datum[0]][0], n_neurons[datum[0]][1], time[0], time[1])
@@ -100,7 +100,7 @@ def plot_spikes(spikes: Dict[str, torch.Tensor], time: Optional[Tuple[int, int]]
             for i, datum in enumerate(spikes.items()):
                 axes[i].set_xlim([time[0],time[1]])
                 axes[i].set_ylim([n_neurons[datum[0]][0], n_neurons[datum[0]][1]])
-                temp = datum[1].nonzero().numpy().T
+                temp = datum[1].nonzero().cpu().numpy().T
                 if len(temp) !=0:
                     ims.append(axes[i].plot(temp[1], temp[0], 'k.')[0])
                 else:
@@ -123,7 +123,7 @@ def plot_spikes(spikes: Dict[str, torch.Tensor], time: Optional[Tuple[int, int]]
                 axes[i].set_xlim([time[0],time[1]])
                 axes[i].set_ylim([n_neurons[datum[0]][0], n_neurons[datum[0]][1]])
 
-                temp = datum[1].nonzero().numpy().T
+                temp = datum[1].nonzero().cpu().numpy().T
                 if len(temp) !=0:
                     ims[i].set_data(temp[1], temp[0])
                 else:
@@ -388,7 +388,7 @@ def plot_voltages(voltages: Dict[str, torch.Tensor], ims: Optional[List[AxesImag
         if n_subplots == 1:  # Plotting only one image
             for v in voltages.items():
                 if plot_type == 'line':
-                    ims.append(axes.plot(v[1][n_neurons[v[0]][0]:n_neurons[v[0]][1], time[0]:time[1]].numpy().T))
+                    ims.append(axes.plot(v[1][n_neurons[v[0]][0]:n_neurons[v[0]][1], time[0]:time[1]].cpu().numpy().T))
                     ims.append(axes.axhline(y=threshold[v[0]], c='r', linestyle='--'))
                 else:
                     ims.append(axes.pcolormesh(v[1][n_neurons[v[0]][0]:n_neurons[v[0]][1], time[0]:time[1]], cmap=cmap))
@@ -401,7 +401,7 @@ def plot_voltages(voltages: Dict[str, torch.Tensor], ims: Optional[List[AxesImag
         else:  # Plot each layer at a time
             for i, v in enumerate(voltages.items()):
                 if plot_type == 'line':
-                    ims.append(axes[i].plot(v[1][n_neurons[v[0]][0]:n_neurons[v[0]][1], time[0]:time[1]].numpy().T))
+                    ims.append(axes[i].plot(v[1][n_neurons[v[0]][0]:n_neurons[v[0]][1], time[0]:time[1]].cpu().numpy().T))
                     ims.append(axes[i].axhline(y=threshold[v[0]], c='r', linestyle='--'))
                 else:
                     ims.append(axes[i].matshow(v[1][n_neurons[v[0]][0]:n_neurons[v[0]][1], time[0]:time[1]], cmap=cmap))
@@ -419,7 +419,7 @@ def plot_voltages(voltages: Dict[str, torch.Tensor], ims: Optional[List[AxesImag
             for v in voltages.items():
                 axes.clear()
                 if plot_type == 'line':
-                    axes.plot(v[1][n_neurons[v[0]][0]:n_neurons[v[0]][1], time[0]:time[1]].numpy().T)
+                    axes.plot(v[1][n_neurons[v[0]][0]:n_neurons[v[0]][1], time[0]:time[1]].cpu().numpy().T)
                     axes.axhline(y=threshold[v[0]], c='r', linestyle='--')
                 else:
                     axes.matshow(v[1][n_neurons[v[0]][0]:n_neurons[v[0]][1], time[0]:time[1]], cmap=cmap)
@@ -431,7 +431,7 @@ def plot_voltages(voltages: Dict[str, torch.Tensor], ims: Optional[List[AxesImag
             for i, v in enumerate(voltages.items()):
                 axes[i].clear()
                 if plot_type == 'line':
-                    axes[i].plot(v[1][n_neurons[v[0]][0]:n_neurons[v[0]][1], time[0]:time[1]].numpy().T)
+                    axes[i].plot(v[1][n_neurons[v[0]][0]:n_neurons[v[0]][1], time[0]:time[1]].cpu().numpy().T)
                     axes[i].axhline(y=threshold[v[0]], c='r', linestyle='--')
                 else:
                     axes[i].matshow(v[1][n_neurons[v[0]][0]:n_neurons[v[0]][1], time[0]:time[1]], cmap=cmap)
