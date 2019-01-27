@@ -5,7 +5,6 @@ from typing import Dict
 from .nodes import AbstractInput, Nodes
 from .topology import AbstractConnection
 from .monitors import AbstractMonitor
-from ..learning import MSTDP, MSTDPET
 
 __all__ = [
     'load_network', 'Network', 'nodes', 'monitors', 'topology'
@@ -16,7 +15,6 @@ def load_network(file_name: str, learning: bool = None) -> 'Network':
     # language=rst
     """
     Loads serialized network object from disk.
-
     :param file_name: Path to serialized network object on disk.
     :param learning: Whether to load with learning enabled. Default loads value from disk.
     """
@@ -29,48 +27,35 @@ def load_network(file_name: str, learning: bool = None) -> 'Network':
 class Network:
     # language=rst
     """
-
     Most important object of the :code:`bindsnet` package. Responsible for the simulation and interaction of nodes and
     connections.
-
     **Example:**
-
     .. code-block:: python
-
         import torch
         import matplotlib.pyplot as plt
-
         from bindsnet         import encoding
         from bindsnet.network import Network, nodes, topology, monitors
-
         network = Network(dt=1.0)  # Instantiates network.
-
         X = nodes.Input(100)  # Input layer.
         Y = nodes.LIFNodes(100)  # Layer of LIF neurons.
         C = topology.Connection(source=X, target=Y, w=torch.rand(X.n, Y.n))  # Connection from X to Y.
-
         # Spike monitor objects.
         M1 = monitors.Monitor(obj=X, state_vars=['s'])
         M2 = monitors.Monitor(obj=Y, state_vars=['s'])
-
         # Add everything to the network object.
         network.add_layer(layer=X, name='X')
         network.add_layer(layer=Y, name='Y')
         network.add_connection(connection=C, source='X', target='Y')
         network.add_monitor(monitor=M1, name='X')
         network.add_monitor(monitor=M2, name='Y')
-
         # Create Poisson-distributed spike train inputs.
         data = 15 * torch.rand(1, 100)  # Generate random Poisson rates for 100 input neurons.
         train = encoding.poisson(datum=data, time=5000)  # Encode input as 5000ms Poisson spike trains.
-
         # Simulate network on generated spike trains.
         inpts = {'X' : train}  # Create inputs mapping.
         network.run(inpts=inpts, time=5000)  # Run network simulation.
-
         # Plot spikes of input and output layers.
         spikes = {'X' : M1.get('s'), 'Y' : M2.get('s')}
-
         fig, axes = plt.subplots(2, 1, figsize=(12, 7))
         for i, layer in enumerate(spikes):
             axes[i].matshow(spikes[layer], cmap='binary')
@@ -78,7 +63,6 @@ class Network:
             axes[i].set_xlabel('Time'); axes[i].set_ylabel('Index of neuron')
             axes[i].set_xticks(()); axes[i].set_yticks(())
             axes[i].set_aspect('auto')
-
         plt.tight_layout(); plt.show()
     """
 
@@ -99,7 +83,6 @@ class Network:
         # language=rst
         """
         Adds a layer of nodes to the network.
-
         :param layer: A subclass of the ``Nodes`` object.
         :param name: Logical name of layer.
         """
@@ -111,7 +94,6 @@ class Network:
         # language=rst
         """
         Adds a connection between layers of nodes to the network.
-
         :param connection: An instance of class ``Connection``.
         :param source: Logical name of the connection's source layer.
         :param target: Logical name of the connection's target layer.
@@ -124,7 +106,6 @@ class Network:
         # language=rst
         """
         Adds a monitor on a network object to the network.
-
         :param monitor: An instance of class ``Monitor``.
         :param name: Logical name of monitor object.
         """
@@ -136,32 +117,23 @@ class Network:
         # language=rst
         """
         Serializes the network object to disk.
-
         :param file_name: Path to store serialized network object on disk.
-
         **Example:**
-
         .. code-block:: python
-
             import torch
             import matplotlib.pyplot as plt
-
             from pathlib          import Path
             from bindsnet.network import *
             from bindsnet.network import topology
-
             # Build simple network.
             network = Network(dt=1.0)
-
             X = nodes.Input(100)  # Input layer.
             Y = nodes.LIFNodes(100)  # Layer of LIF neurons.
             C = topology.Connection(source=X, target=Y, w=torch.rand(X.n, Y.n))  # Connection from X to Y.
-
             # Add everything to the network object.
             network.add_layer(layer=X, name='X')
             network.add_layer(layer=Y, name='Y')
             network.add_connection(connection=C, source='X', target='Y')
-
             # Save the network to disk.
             network.save(str(Path.home()) + '/network.pt')
         """
@@ -171,7 +143,6 @@ class Network:
         # language=rst
         """
         Fetches outputs from network layers to use as input to downstream layers.
-
         :return: Inputs to all layers for the current iteration.
         """
         inpts = {}
@@ -183,7 +154,7 @@ class Network:
             target = self.connections[c].target
 
             if not c[1] in inpts:
-                inpts[c[1]] = torch.zeros(target.shape, device=self.device)
+                inpts[c[1]] = torch.zeros(target.shape)
 
             # Add to input: source's spikes multiplied by connection weights.
             inpts[c[1]] += self.connections[c].compute(source.s)
@@ -194,12 +165,9 @@ class Network:
         # language=rst
         """
         Simulation network for given inputs and time.
-
         :param inpts: Dictionary of ``Tensor``s of shape ``[time, n_input]``.
         :param time: Simulation time.
-
         Keyword arguments:
-
         :param Dict[str, torch.Tensor] clamp: Mapping of layer names to boolean masks if neurons should be clamped to
                                               spiking. The ``Tensor``s have shape ``[n_neurons]``.
         :param Dict[str, torch.Tensor] unclamp: Mapping of layer names to boolean masks if neurons should be clamped
@@ -207,29 +175,21 @@ class Network:
         :param float reward: Scalar value used in reward-modulated learning.
         :param Dict[Tuple[str], torch.Tensor] masks: Mapping of connection names to boolean masks determining which
                                                      weights to clamp to zero.
-
         **Example:**
-
         .. code-block:: python
-
             import torch
             import matplotlib.pyplot as plt
-
             from bindsnet.network import Network
             from bindsnet.network.nodes import Input
             from bindsnet.network.monitors import Monitor
-
             # Build simple network.
             network = Network()
             network.add_layer(Input(500), name='I')
             network.add_monitor(Monitor(network.layers['I'], state_vars=['s']), 'I')
-
             # Generate spikes by running Bernoulli trials on Uniform(0, 0.5) samples.
             spikes = torch.bernoulli(0.5 * torch.rand(500, 500))
-
             # Run network simulation.
             network.run(inpts={'I' : spikes}, time=500)
-
             # Look at input spiking activity.
             spikes = network.monitors['I'].get('s')
             plt.matshow(spikes, cmap='binary')
@@ -287,9 +247,9 @@ class Network:
             for m in self.monitors:
                 self.monitors[m].record()
 
-            # Re-normalize connections.
-            for c in self.connections:
-                self.connections[c].normalize()
+        # Re-normalize connections.
+        for c in self.connections:
+            self.connections[c].normalize()
 
     def reset_(self) -> None:
         # language=rst

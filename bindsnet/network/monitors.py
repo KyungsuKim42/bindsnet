@@ -54,27 +54,19 @@ class Monitor(AbstractMonitor):
     """
     Records state variables of interest.
     """
-    def __init__(self, obj: Union[Nodes, AbstractConnection],
-            state_vars: Iterable[str], time: Optional[int]=None, device=None,
-            batch=False):
+    def __init__(self, obj: Union[Nodes, AbstractConnection], state_vars: Iterable[str], time: Optional[int]=None):
         # language=rst
         """
         Constructs a ``Monitor`` object.
-
         :param obj: An object to record state variables from during network simulation.
         :param state_vars: Iterable of strings indicating names of state variables to record.
         :param time: If not ``None``, pre-allocate memory for state variable recording.
-        :param device: Which device to use.
-        :param batch: If batch-learning enabled or not. If True, then only
-            record the first sample from the batch.
         """
         super().__init__()
 
         self.obj = obj
         self.state_vars = state_vars
         self.time = time
-        self.device = device
-        self.batch = batch
 
         # If no simulation time is specified, specify 0-dimensional recordings.
         if self.time is None:
@@ -92,7 +84,6 @@ class Monitor(AbstractMonitor):
         # language=rst
         """
         Return recording to user.
-
         :param var: State variable recording to return.
         :return: Tensor of shape ``[n_1, ..., n_k, time]``, where ``[n_1, ..., n_k]`` is the shape of the recorded
                  state variable.
@@ -106,22 +97,13 @@ class Monitor(AbstractMonitor):
         """
         if self.time is None:
             for v in self.state_vars:
-                if batch:
-                    data = self.obj.__dict__[v][0].unsqueeze(-1).float()
-                else:
-                    data = self.obj.__dict__[v].unsqueeze(-1).float()
-                self.recording[v] = torch.cat([self.recording[v], data], -1)
-            self.record_length += 1
+                data = self.obj.__dict__[v].unsqueeze(-1)
+                self.recording[v] = torch.cat([self.recording[v].type(data.type()), data], -1)
         else:
             for v in self.state_vars:
-                if batch:
-                    data = self.obj.__dict__[v][0].unsqueeze(-1).float()
-                else:
-                    data = self.obj.__dict__[v].unsqueeze(-1).float()
-                if self.time is None or self.record_length==self.time:
-
-                else:
-                    self.recording[v] = torch.cat([self.recording[v][...,1:], data], -1)
+                # Remove the oldest data and concatenate new data
+                data = self.obj.__dict__[v].unsqueeze(-1)
+                self.recording[v] = torch.cat([self.recording[v][..., 1:].type(data.type()), data], -1)
 
     def reset_(self) -> None:
         # language=rst
@@ -153,7 +135,6 @@ class NetworkMonitor(AbstractMonitor):
         # language=rst
         """
         Constructs a ``NetworkMonitor`` object.
-
         :param network: Network to record state variables from.
         :param layers: Layers to record state variables from.
         :param connections: Connections to record state variables from.
@@ -200,7 +181,6 @@ class NetworkMonitor(AbstractMonitor):
         # language=rst
         """
         Return entire recording to user.
-
         :return: Dictionary of dictionary of all layers' and connections' recorded state variables.
         """
         return self.recording
@@ -240,7 +220,6 @@ class NetworkMonitor(AbstractMonitor):
         # language=rst
         """
         Write the recording dictionary out to file.
-
         :param path: The directory to which to write the monitor's recording.
         :param fmt: Type of file to write to disk. One of ``"pickle"`` or ``"npz"``.
         """

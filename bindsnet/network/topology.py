@@ -20,16 +20,11 @@ class AbstractConnection(ABC):
         # language=rst
         """
         Constructor for abstract base class for connection objects.
-
         :param source: A layer of nodes from which the connection originates.
         :param target: A layer of nodes to which the connection connects.
         :param nu: Learning rate for both pre- and post-synaptic events.
         :param weight_decay: Constant multiple to decay weights by on each iteration.
-        :param dt: Time length of single timestep.
-        :param device: Device to use.
-
         Keyword arguments:
-
         :param function update_rule: Modifies connection parameters according to some rule.
         :param float wmin: The minimum value on the connection weights.
         :param float wmax: The maximum value on the connection weights.
@@ -40,13 +35,11 @@ class AbstractConnection(ABC):
         self.target = target
         self.nu = nu
         self.weight_decay = weight_decay
-        self.dt = dt
-        self.device = device
 
         assert isinstance(source, Nodes), 'Source is not a Nodes object'
         assert isinstance(target, Nodes), 'Target is not a Nodes object'
 
-        from ..learning import NoOp, MSTDP, MSTDPET
+        from ..learning import NoOp
 
         self.update_rule = kwargs.get('update_rule', NoOp)
         self.wmin = kwargs.get('wmin', None)
@@ -56,8 +49,6 @@ class AbstractConnection(ABC):
 
         if self.update_rule is None:
             self.update_rule = NoOp
-
-        self.update_done = False
 
         self.a_pre = 0.0
 
@@ -70,7 +61,6 @@ class AbstractConnection(ABC):
         # language=rst
         """
         Compute pre-activations of downstream neurons given spikes of upstream neurons.
-
         :param s: Incoming spikes.
         """
         pass
@@ -114,20 +104,15 @@ class Connection(AbstractConnection):
     """
 
     def __init__(self, source: Nodes, target: Nodes, nu: Optional[Union[float, Sequence[float]]] = None,
-                 weight_decay: float = 0.0, dt:float = 1.0, device=None, **kwargs) -> None:
+                 weight_decay: float = 0.0, **kwargs) -> None:
         # language=rst
         """
         Instantiates a :code:`Connection` object.
-
         :param source: A layer of nodes from which the connection originates.
         :param target: A layer of nodes to which the connection connects.
         :param nu: Learning rate for both pre- and post-synaptic events.
         :param weight_decay: Constant multiple to decay weights by on each iteration.
-        :param dt: Time length of single timestep.
-        :param device: Device to use.
-
         Keyword arguments:
-
         :param function update_rule: Modifies connection parameters according to some rule.
         :param torch.Tensor w: Strengths of synapses.
         :param torch.Tensor b: Target population bias.
@@ -135,26 +120,24 @@ class Connection(AbstractConnection):
         :param float wmax: Maximum allowed value on the connection weights.
         :param float norm: Total weight per target neuron normalization constant.
         """
-        super().__init__(source, target, nu, weight_decay, dt, device, **kwargs)
+        super().__init__(source, target, nu, weight_decay, **kwargs)
 
         self.w = kwargs.get('w', None)
         if self.w is None:
             if self.wmin is None or self.wmax is None:
-                self.w = torch.rand(source.n, target.n, device=self.device)
+                self.w = torch.rand(source.n, target.n)
             elif self.wmin is not None and self.wmax is not None:
-                self.w = self.wmin + torch.rand(source.n, target.n, device=self.device) * (self.wmax - self.wmin)
+                self.w = self.wmin + torch.rand(source.n, target.n) * (self.wmax - self.wmin)
         else:
             if self.wmin is not None and self.wmax is not None:
                 self.w = torch.clamp(self.w, self.wmin, self.wmax)
 
-        self.b = kwargs.get('b', torch.zeros(target.n, device=self.device))
-
+        self.b = kwargs.get('b', torch.zeros(target.n))
 
     def compute(self, s: torch.Tensor) -> torch.Tensor:
         # language=rst
         """
         Compute pre-activations given spikes using connection weights.
-
         :param s: Incoming spikes.
         :return: Incoming spikes multiplied by synaptic weights (with or without decaying spike activation).
         """
@@ -168,12 +151,6 @@ class Connection(AbstractConnection):
         Compute connection's update rule.
         """
         super().update(**kwargs)
-
-    def reward_modulated_update(self, reward, action, num_action) -> None:
-        """
-        Conduct reward modulated update.
-        """
-        self.update_rule.weight_update(reward, action, num_action)
 
     def normalize(self) -> None:
         # language=rst
@@ -189,9 +166,6 @@ class Connection(AbstractConnection):
         Contains resetting logic for the connection.
         """
         super().reset_()
-        from ..learning import MSTDPET
-        if isinstance(self.update_rule,MSTDPET):
-            self.update_rule.reset()
 
 
 class Conv2dConnection(AbstractConnection):
@@ -207,7 +181,6 @@ class Conv2dConnection(AbstractConnection):
         # language=rst
         """
         Instantiates a ``Conv2dConnection`` object.
-
         :param source: A layer of nodes from which the connection originates.
         :param target: A layer of nodes to which the connection connects.
         :param kernel_size: Horizontal and vertical size of convolutional kernels.
@@ -216,9 +189,7 @@ class Conv2dConnection(AbstractConnection):
         :param dilation: Horizontal and vertical dilation for convolution.
         :param nu: Learning rate for both pre- and post-synaptic events.
         :param weight_decay: Constant multiple to decay weights by on each iteration.
-
         Keyword arguments:
-
         :param function update_rule: Modifies connection parameters according to some rule.
         :param torch.Tensor w: Strengths of synapses.
         :param torch.Tensor b: Target population bias.
@@ -256,7 +227,6 @@ class Conv2dConnection(AbstractConnection):
         # language=rst
         """
         Compute convolutional pre-activations given spikes using layer weights.
-
         :param s: Incoming spikes.
         :return: Spikes multiplied by synapse weights.
         """
@@ -305,16 +275,13 @@ class MaxPool2dConnection(AbstractConnection):
         # language=rst
         """
         Instantiates a ``MaxPool2dConnection`` object.
-
         :param source: A layer of nodes from which the connection originates.
         :param target: A layer of nodes to which the connection connects.
         :param kernel_size: Horizontal and vertical size of convolutional kernels.
         :param stride: Horizontal and vertical stride for convolution.
         :param padding: Horizontal and vertical padding for convolution.
         :param dilation: Horizontal and vertical dilation for convolution.
-
         Keyword arguments:
-
         :param decay: Decay rate of online estimates of average firing activity.
         """
         super().__init__(source, target, nu, weight_decay, **kwargs)
@@ -330,7 +297,6 @@ class MaxPool2dConnection(AbstractConnection):
         # language=rst
         """
         Compute max-pool pre-activations given spikes using online firing rate estimates.
-
         :param s: Incoming spikes.
         :return: Spikes multiplied by synapse weights.
         """
@@ -380,7 +346,6 @@ class LocallyConnectedConnection(AbstractConnection):
         # language=rst
         """
         Instantiates a ``LocallyConnectedConnection`` object. Source population should be two-dimensional.
-
         :param source: A layer of nodes from which the connection originates.
         :param target: A layer of nodes to which the connection connects.
         :param kernel_size: Horizontal and vertical size of convolutional kernels.
@@ -388,9 +353,7 @@ class LocallyConnectedConnection(AbstractConnection):
         :param n_filters: Number of locally connected filters per pre-synaptic region.
         :param nu: Learning rate for both pre- and post-synaptic events.
         :param weight_decay: Constant multiple to decay weights by on each iteration.
-
         Keyword arguments:
-
         :param function update_rule: Modifies connection parameters according to some rule.
         :param torch.Tensor w: Strengths of synapses.
         :param torch.Tensor b: Target population bias.
@@ -463,7 +426,6 @@ class LocallyConnectedConnection(AbstractConnection):
         # language=rst
         """
         Compute pre-activations given spikes using layer weights.
-
         :param s: Incoming spikes.
         :return: Incoming spikes multiplied by synaptic weights (with or with decaying spike activation).
         """
@@ -514,14 +476,11 @@ class MeanFieldConnection(AbstractConnection):
         # language=rst
         """
         Instantiates a :code:`MeanFieldConnection` object.
-
         :param source: A layer of nodes from which the connection originates.
         :param target: A layer of nodes to which the connection connects.
         :param nu: Learning rate for both pre- and post-synaptic events.
         :param weight_decay: Constant multiple to decay weights by on each iteration.
-
         Keyword arguments:
-
         :param function update_rule: Modifies connection parameters according to some rule.
         :param torch.Tensor w: Strengths of synapses.
         :param float wmin: Minimum allowed value on the connection weights.
@@ -542,7 +501,6 @@ class MeanFieldConnection(AbstractConnection):
         # language=rst
         """
         Compute pre-activations given spikes using layer weights.
-
         :param s: Incoming spikes.
         :return: Incoming spikes multiplied by synaptic weights (with or with decaying spike activation).
         """
@@ -585,14 +543,11 @@ class SparseConnection(AbstractConnection):
         # language=rst
         """
         Instantiates a :code:`Connection` object with sparse weights.
-
         :param source: A layer of nodes from which the connection originates.
         :param target: A layer of nodes to which the connection connects.
         :param nu: Learning rate for both pre- and post-synaptic events.
         :param weight_decay: Constant multiple to decay weights by on each iteration.
-
         Keyword arguments:
-
         :param torch.Tensor w: Strengths of synapses.
         :param float sparsity: Fraction of sparse connections to use.
         :param function update_rule: Modifies connection parameters according to some rule.
@@ -619,7 +574,6 @@ class SparseConnection(AbstractConnection):
         # language=rst
         """
         Compute convolutional pre-activations given spikes using layer weights.
-
         :param s: Incoming spikes.
         :return: Spikes multiplied by synapse weights.
         """
