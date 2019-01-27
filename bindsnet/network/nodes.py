@@ -320,8 +320,8 @@ class IFNodes(Nodes):
 class BPLIFNodes(Nodes):
     # language=rst
     """
-    Layer of `leaky integrate-and-fire (LIF) neurons
-    <http://icwww.epfl.ch/~gerstner/SPNM/node26.html#SECTION02311000000000000000>`_.
+    Back-propagation enabled version of LIFNodes. It contains the value of delta
+    and spike_count for gradient descent.
     """
 
     def __init__(self, n: Optional[int] = None, shape: Optional[Iterable[int]] = None, traces: bool = False,
