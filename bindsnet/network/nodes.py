@@ -121,7 +121,7 @@ class Input(Nodes, AbstractInput):
         :param sum_input: Whether to sum all inputs.
         """
         super().__init__(n, shape, traces, trace_tc, sum_input)
-
+        self.spike_count = torch.zeros(self.shape)
 
     def forward(self, x: torch.Tensor) -> None:
         # language=rst
@@ -133,6 +133,7 @@ class Input(Nodes, AbstractInput):
         # Set spike occurrences to input values.
         self.s = x.byte()
         super().forward(x)
+        self.spike_count += self.s.float()
 
     def reset_(self) -> None:
         # language=rst
@@ -140,6 +141,7 @@ class Input(Nodes, AbstractInput):
         Resets relevant state variables.
         """
         super().reset_()
+        self.spike_count = torch.zeros(self.shape)
 
 
 class RealInput(Nodes, AbstractInput):
