@@ -23,6 +23,43 @@ def single(datum: torch.Tensor, time: int, dt: float = 1.0, sparsity: float = 0.
     s[0] = np.where(datum > quantile, np.ones(shape), np.zeros(shape))
     return torch.Tensor(s).byte()
 
+def rate(datum: torch.Tensor, time: int, dt: float=1.0, max_rate: float=40.0, **kwargs) -> torch.Tensor:
+    #language=rst
+    """
+    Generate deterministic rate-coded spike-train. Rate is proportional to the
+    intensity of the input.
+
+    :param datum: Tensor of shape ``[n_1, ..., n_k]``.
+    :param time: Length of the input and output.
+    :param dt: Simulation time step.
+    :param max_rate: maximum spiking rate. Unit in Hz.
+    :return: Tensor of shape ``[time, n_1, ..., n_k]``.
+    """
+
+    assert max_rate * (dt/1000.0) < 1, 'Maximum firing rate is too high'
+
+    shape = datum.shape
+    datum = datum.view(-1)
+
+    # Normalize inputs and rescale (spike probability proportional to normalized intensity).
+    if datum.max() > 1.0:
+        datum /= datum.max()
+
+    time = int(time/dt)
+    dv = max_rate * (dt/1000.0)
+    v = torch.zeros(*shape)
+    spikes = torch.zeros(time,*shape)
+
+    v = dv*datum
+    for t in range(time):
+        spike_index = v[t]>1.0
+        spikes[t,spike_index] = 1
+        v[spike_index] -= 1
+        v += dv*datum
+
+    return spikes.byte()
+
+
 
 def repeat(datum: torch.Tensor, time: int, dt: float = 1.0, **kwargs) -> torch.Tensor:
     # language=rst
