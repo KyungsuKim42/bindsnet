@@ -48,16 +48,16 @@ def rate(datum: torch.Tensor, time: int, dt: float=1.0, max_rate: float=40.0, **
     time = int(time/dt)
     dv = max_rate * (dt/1000.0)
     v = torch.zeros(*shape)
-    spikes = torch.zeros(time,*shape)
+    spikes = torch.zeros([time,*shape])
 
     v = dv*datum
     for t in range(time):
-        spike_index = v[t]>1.0
+        spike_index = v>1.0
         spikes[t,spike_index] = 1
         v[spike_index] -= 1
         v += dv*datum
 
-    return spikes.byte()
+    return torch.tensor(spikes).byte()
 
 
 
