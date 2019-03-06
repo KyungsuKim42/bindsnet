@@ -322,10 +322,14 @@ class BPLIFNodes(Nodes):
     and spike_count for gradient descent.
     """
 
-    def __init__(self, n: Optional[int] = None, shape: Optional[Iterable[int]] = None, traces: bool = False,
-                 trace_tc: Union[float, torch.Tensor] = 5e-2, sum_input: bool = False,
-                 thresh: Union[float, torch.Tensor] = -52.0, rest: Union[float, torch.Tensor] = -65.0,
-                 reset: Union[float, torch.Tensor] = -65.0, refrac: Union[int, torch.Tensor] = 5,
+    def __init__(self, n: Optional[int] = None,
+                 shape: Optional[Iterable[int]] = None, traces: bool = False,
+                 trace_tc: Union[float, torch.Tensor] = 1e-2,
+                 sum_input: bool = False,
+                 thresh: Union[float, torch.Tensor] = -52.0,
+                 rest: Union[float, torch.Tensor] = -65.0,
+                 reset: Union[float, torch.Tensor] = -65.0,
+                 refrac: Union[int, torch.Tensor] = 5,
                  lbound: float = None,
                  decay: Union[float, torch.Tensor] = 1e-2,
                  ) -> None:
@@ -413,9 +417,8 @@ class BPLIFNodes(Nodes):
 
         # Refractoriness and voltage reset.
         self.refrac_count.masked_fill_(self.s, self.refrac)
-        self.v.masked_fill_(self.s, self.reset)
+        self.v[self.s] -= self.thresh
         self.spike_count += self.s.float()
-
         super().forward(x)
 
     def reset_(self) -> None:

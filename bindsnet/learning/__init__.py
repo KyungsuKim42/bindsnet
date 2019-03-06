@@ -86,6 +86,12 @@ class NoOp(LearningRule):
         """
         super().update()
 
+    def reset(self) -> None:
+        """
+        Abstract method for resetting update rule.
+        """
+        pass
+
 
 class PostPre(LearningRule):
     # language=rst
@@ -591,3 +597,65 @@ class MSTDPET(LearningRule):
         print(f'changed std :{delta.std()}')
         print(f'w_min: {torch.sum(self.connection.w<=self.connection.wmin)}')
         print(f'w_max: {torch.sum(self.connection.w>=self.connection.wmax)}')
+
+class Eligibility(LearningRule):
+    def __init__(self, connection: AbstractConnection, nu: Optional[Union[float, Sequence[float]]] = None,
+                 weight_decay: float = 0.0, **kwargs) -> None:
+        # language=rst
+        """
+        Constructor for ``eligibility`` learning rule.
+
+        :param connection: An ``AbstractConnection`` object whose weights the ``MSTDPET`` learning rule will modify.
+        :param nu: Single or pair of learning rates for pre- and post-synaptic events, respectively.
+        :param weight_decay: Constant multiple to decay weights by on each iteration.
+
+        Keyword arguments:
+
+        :param float tc_e_trace: Time constant of the eligibility trace.
+        """
+        super().__init__(
+            connection=connection, nu=nu, weight_decay=weight_decay, **kwargs)
+
+        assert self.source.traces and self.target.traces, 'Both pre- and post-synaptic nodes must record spike traces.'
+
+
+        if isinstance(connection, (Connection, LocallyConnectedConnection)):
+            self.update = self._connection_update
+        else:
+            raise NotImplementedError(
+                'This learning rule is not supported for this Connection type.'
+            )
+
+        self.e_trace = torch.zeros(self.source.n, self.target.n)
+
+    def _connection_update(self, **kwargs) -> None:
+        # language=rst
+        """
+        M-STDP-ET learning rule for ``Connection`` subclass of ``AbstractConnection`` class.
+
+        Keyword arguments:
+
+        :param float reward: Reward signal from reinforcement learning task.
+        :param float a_plus: Learning rate (post-synaptic).
+        :param float a_minus: Learning rate (pre-synaptic).
+        """
+        super().update()
+
+        source_x = self.source.x.view(-1)
+        target_s = self.target.s.view(-1).float()
+
+        # Parse keyword arguments.
+        a_plus = kwargs.get('a_plus', 1)
+
+        # Get P^+ and values (function of firing traces).
+        self.p_plus = a_plus * source_x
+
+        # Calculate value of eligibility trace.
+        update = torch.ger(self.p_plus, target_s)
+        self.e_trace[update != 0] += update[update != 0]
+
+        # Compute weight update.
+
+    def reset(self):
+        self.e_trace = torch.zeros(self.source.n, self.target.n)
+        self.p_plus = torch.zeros(self.source.n)
