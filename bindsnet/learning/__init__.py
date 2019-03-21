@@ -627,31 +627,21 @@ class Eligibility(LearningRule):
             )
 
         self.e_trace = torch.zeros(self.source.n, self.target.n)
+        self.is_pre_spiked = torch.zeros(self.source.n, self.target.n)
 
     def _connection_update(self, **kwargs) -> None:
         # language=rst
-        """
-        M-STDP-ET learning rule for ``Connection`` subclass of ``AbstractConnection`` class.
-
-        Keyword arguments:
-
-        :param float reward: Reward signal from reinforcement learning task.
-        :param float a_plus: Learning rate (post-synaptic).
-        :param float a_minus: Learning rate (pre-synaptic).
-        """
         super().update()
 
-        source_x = self.source.x.view(-1)
-        target_s = self.target.s.view(-1).float()
-
-        # Parse keyword arguments.
-        a_plus = kwargs.get('a_plus', 1)
-
-        # Get P^+ and values (function of firing traces).
-        self.p_plus = a_plus * source_x
+        source_x = self.source.pre_x.view(-1)
+        source_s = self.source.pre_s.view(-1)
+        target_s = self.target.s.view(-1)
 
         # Calculate value of eligibility trace.
-        update = torch.ger(self.p_plus, target_s)
+        self.is_pre_spiked[source_s,:] = 1
+        update = torch.ger(source_x, target_s.float())
+        update *= self.is_pre_spiked
+        self.is_pre_spiked[:,target_s] = 0
         self.e_trace[update != 0] += update[update != 0]
 
         # Compute weight update.

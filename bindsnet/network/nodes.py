@@ -122,6 +122,10 @@ class Input(Nodes, AbstractInput):
         """
         super().__init__(n, shape, traces, trace_tc, sum_input)
         self.spike_count = torch.zeros(self.shape)
+        self.s = torch.zeros(self.shape).byte()
+        # pre_s, pre_x for accesing to the last s, x at learning period.
+        self.pre_s = torch.zeros(self.shape)
+        self.pre_x = torch.zeros(self.shape)
 
     def forward(self, x: torch.Tensor) -> None:
         # language=rst
@@ -131,9 +135,13 @@ class Input(Nodes, AbstractInput):
         :param x: Inputs to the layer.
         """
         # Set spike occurrences to input values.
+        self.pre_s = self.s
         self.s = x.byte()
-        super().forward(x)
         self.spike_count += self.s.float()
+
+        self.pre_x = self.x
+        self.x -= self.dt * self.trace_tc * self.x
+        self.x += self.s.float()
 
     def reset_(self) -> None:
         # language=rst
@@ -173,7 +181,7 @@ class RealInput(Nodes, AbstractInput):
         :param x: Inputs to the layer.
         """
         # Set spike occurrences to input values.
-        self.s = self.dt * x
+        self.s = x
 
         if self.traces:
             # Decay and set spike traces.
@@ -391,6 +399,8 @@ class BPLIFNodes(Nodes):
         self.refrac_count = torch.zeros(self.shape)  # Refractory period counters.
         self.spike_count = torch.zeros(self.shape)
         self.delta = torch.zeros(self.shape)
+        self.pre_s = torch.zeros(self.shape)
+        self.pre_x = torch.zeros(self.shape)
 
     def forward(self, x: torch.Tensor) -> None:
         # language=rst
@@ -412,14 +422,19 @@ class BPLIFNodes(Nodes):
         # Decrement refractory counters.
         self.refrac_count[self.refrac_count != 0] -= self.dt
 
+
         # Check for spiking neurons.
+        self.pre_s = self.s
         self.s = self.v >= self.thresh
 
         # Refractoriness and voltage reset.
         self.refrac_count.masked_fill_(self.s, self.refrac)
         self.v[self.s] -= self.thresh
         self.spike_count += self.s.float()
-        super().forward(x)
+
+        self.pre_x = self.x
+        self.x -= self.dt * self.trace_tc * self.x
+        self.x += self.s.float()
 
     def reset_(self) -> None:
         # language=rst
