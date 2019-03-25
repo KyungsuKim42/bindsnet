@@ -8,7 +8,6 @@ from torch.nn.modules.utils import _pair
 
 from .nodes import Nodes
 
-
 class AbstractConnection(ABC):
     # language=rst
     """
@@ -166,6 +165,8 @@ class Connection(AbstractConnection):
         Contains resetting logic for the connection.
         """
         super().reset_()
+        if hasattr(self.update_rule, 'reset'):
+            self.update_rule.reset()
 
 
 class Conv2dConnection(AbstractConnection):

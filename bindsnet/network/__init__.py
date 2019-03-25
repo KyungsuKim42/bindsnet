@@ -211,28 +211,17 @@ class Network:
 
         # Simulate network activity for `time` timesteps.
         for t in range(timesteps):
-            for l in self.layers:
-                # Update each layer of nodes.
-                if isinstance(self.layers[l], AbstractInput):
-                    self.layers[l].forward(x=inpts[l][t])
-                else:
-                    self.layers[l].forward(x=inpts[l])
+            # ad-hoc, needs to be generalized.
+            forward = inpts['IN'][t]
+            for c in self.connections:
+                # Fetch source and target populations.
+                source = self.connections[c].source
+                target = self.connections[c].target
 
-                # Clamp neurons to spike.
-                clamp = clamps.get(l, None)
-                if clamp is not None:
-                    if clamp.ndimension() == 1:
-                        self.layers[l].s[clamp] = 1
-                    else:
-                        self.layers[l].s[clamp[t]] = 1
-
-                # Clamp neurons not to spike.
-                unclamp = unclamps.get(l, None)
-                if unclamp is not None:
-                    if unclamp.ndimension() == 1:
-                        self.layers[l].s[unclamp] = 0
-                    else:
-                        self.layers[l].s[unclamp[t]] = 0
+                source.forward(forward)
+                # Add to input: source's spikes multiplied by connection weights.
+                forward = self.connections[c].compute(source.s)
+            target.forward(forward)
 
             # Run synapse updates.
             for c in self.connections:

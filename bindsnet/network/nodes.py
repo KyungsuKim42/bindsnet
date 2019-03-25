@@ -172,6 +172,7 @@ class RealInput(Nodes, AbstractInput):
         super().__init__(n, shape, traces, trace_tc, sum_input)
 
         self.s = self.s.float()
+        self.v = self.s
 
     def forward(self, x: torch.Tensor) -> None:
         # language=rst
@@ -182,6 +183,7 @@ class RealInput(Nodes, AbstractInput):
         """
         # Set spike occurrences to input values.
         self.s = x
+        self.v = self.s
 
         if self.traces:
             # Decay and set spike traces.

@@ -72,7 +72,6 @@ def plot_spikes(spikes: Dict[str, torch.Tensor], time: Optional[Tuple[int, int]]
     n_subplots = len(spikes.keys())
     if n_neurons is None:
         n_neurons = {}
-
     spikes = {k: v.view(-1, v.size(-1)) for (k, v) in spikes.items()}
     if time is None:
         # Set it for entire duration

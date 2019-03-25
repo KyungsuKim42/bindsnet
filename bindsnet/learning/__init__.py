@@ -632,7 +632,6 @@ class Eligibility(LearningRule):
     def _connection_update(self, **kwargs) -> None:
         # language=rst
         super().update()
-
         source_x = self.source.pre_x.view(-1)
         source_s = self.source.pre_s.view(-1)
         target_s = self.target.s.view(-1)
@@ -642,8 +641,7 @@ class Eligibility(LearningRule):
         update = torch.ger(source_x, target_s.float())
         update *= self.is_pre_spiked
         self.is_pre_spiked[:,target_s] = 0
-        self.e_trace[update != 0] += update[update != 0]
-
+        self.e_trace += update
         # Compute weight update.
 
     def reset(self):
