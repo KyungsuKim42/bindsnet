@@ -46,6 +46,10 @@ class AbstractConnection(ABC):
         self.norm = kwargs.get('norm', None)
         self.decay = kwargs.get('decay', None)
 
+        # Initializing trace time constants.
+        self.trace_tc = kwargs.get('trace_tc', None)
+        self.el_tc = kwargs.get('el_tc', None)
+
         if self.update_rule is None:
             self.update_rule = NoOp
 
@@ -102,7 +106,8 @@ class Connection(AbstractConnection):
     Specifies synapses between one or two populations of neurons.
     """
 
-    def __init__(self, source: Nodes, target: Nodes, nu: Optional[Union[float, Sequence[float]]] = None,
+    def __init__(self, source: Nodes, target: Nodes,
+                 nu: Optional[Union[float, Sequence[float]]] = None,
                  weight_decay: float = 0.0, **kwargs) -> None:
         # language=rst
         """
@@ -112,6 +117,8 @@ class Connection(AbstractConnection):
         :param nu: Learning rate for both pre- and post-synaptic events.
         :param weight_decay: Constant multiple to decay weights by on each iteration.
         Keyword arguments:
+        :param trace_tc: Time constant of synapse trace decaying.
+        :param el_tc: Time constant of eligibility trace decaying.
         :param function update_rule: Modifies connection parameters according to some rule.
         :param torch.Tensor w: Strengths of synapses.
         :param torch.Tensor b: Target population bias.
@@ -132,6 +139,7 @@ class Connection(AbstractConnection):
                 self.w = torch.clamp(self.w, self.wmin, self.wmax)
 
         self.b = kwargs.get('b', torch.zeros(target.n))
+
 
     def compute(self, s: torch.Tensor) -> torch.Tensor:
         # language=rst

@@ -629,8 +629,8 @@ class Eligibility(LearningRule):
         self.e_trace = torch.zeros(self.source.n, self.target.n)
         self.g_trace = torch.zeros(self.source.n, self.target.n)
         # TODO match with other time constants.
-        self.trace_tc = self.connection.trace_tc
-        self.el_tc = self.connection.el_tc
+        self.alpha = 0.05
+        self.beta = 0.1
 
     def _connection_update(self, **kwargs) -> None:
         # TODO Check rigorously if this implementation is proper.
@@ -643,12 +643,12 @@ class Eligibility(LearningRule):
         target_s = self.target.s.view(-1)
 
         # Update g_trace.
-        self.g_trace -= self.trace_tc * self.g_trace
-        self.g_trace += source_s.float().view(-1,1)
+        self.g_trace -= self.beta * self.g_trace
+        self.g_trace += source_s.view(1,-1)
 
         # Update e_trace.
-        self.e_trace -= self.el_tc * self.e_trace
-        self.e_trace += self.g_trace * target_s.float()
+        self.e_trace -= self.alpha * self.e_trace
+        self.e_trace += self.g_trace * self.target_s
 
         # Reset accounted g_trace.
         self.g_trace[:,target_s] = 0
