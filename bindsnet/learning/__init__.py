@@ -627,23 +627,32 @@ class Eligibility(LearningRule):
             )
 
         self.e_trace = torch.zeros(self.source.n, self.target.n)
-        self.is_pre_spiked = torch.zeros(self.source.n, self.target.n)
+        self.g_trace = torch.zeros(self.source.n, self.target.n)
+        # TODO match with other time constants.
+        self.alpha = 0.05
+        self.beta = 0.1
 
     def _connection_update(self, **kwargs) -> None:
+        # TODO Check rigorously if this implementation is proper.
         # language=rst
         super().update()
-        source_x = self.source.pre_x.view(-1)
-        source_s = self.source.pre_s.view(-1)
+        # Since network is simulated in sequential manner, we should use
+        # source.s instead of source.pre_s again.
+        source_x = self.source.x.view(-1)
+        source_s = self.source.s.view(-1)
         target_s = self.target.s.view(-1)
 
-        # Calculate value of eligibility trace.
-        self.is_pre_spiked[source_s,:] = 1
-        update = torch.ger(source_x, target_s.float())
-        update *= self.is_pre_spiked
-        self.is_pre_spiked[:,target_s] = 0
-        self.e_trace += update
-        # Compute weight update.
+        # Update g_trace.
+        self.g_trace -= self.beta * self.g_trace
+        self.g_trace += source_s
+
+        # Update e_trace.
+        self.e_trace -= self.alpha * self.e_trace
+        self.e_trace += self.g_trace * self.target_s
+
+        # Reset accounted g_trace.
+        self.g_trace[:,target_s] = 0
 
     def reset(self):
         self.e_trace = torch.zeros(self.source.n, self.target.n)
-        self.p_plus = torch.zeros(self.source.n)
+        self.g_trace = torch.zeros(self.source.n, self.target.n)
