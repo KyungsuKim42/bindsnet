@@ -52,13 +52,6 @@ class LearningRule(ABC):
         if self.weight_decay:
             self.connection.w -= self.weight_decay * self.connection.w
 
-        # Bound weights.
-        if None not in [self.connection.wmin, self.connection.wmax] and not isinstance(self, NoOp):
-            self.connection.w = torch.clamp(
-                self.connection.w, self.connection.wmin, self.connection.wmax
-            )
-
-
 class NoOp(LearningRule):
     # language=rst
     """
@@ -616,9 +609,6 @@ class Eligibility(LearningRule):
         super().__init__(
             connection=connection, nu=nu, weight_decay=weight_decay, **kwargs)
 
-        assert self.source.traces and self.target.traces, 'Both pre- and post-synaptic nodes must record spike traces.'
-
-
         if isinstance(connection, (Connection, LocallyConnectedConnection)):
             self.update = self._connection_update
         else:
@@ -627,10 +617,8 @@ class Eligibility(LearningRule):
             )
 
         self.e_trace = torch.zeros(self.source.n, self.target.n)
-        self.g_trace = torch.zeros(self.source.n, self.target.n)
         # TODO match with other time constants.
         self.trace_tc = self.connection.trace_tc
-        self.el_tc = self.connection.el_tc
 
     def _connection_update(self, **kwargs) -> None:
         # TODO Check rigorously if this implementation is proper.
@@ -638,21 +626,118 @@ class Eligibility(LearningRule):
         super().update()
         # Since network is simulated in sequential manner, we should use
         # source.s instead of source.pre_s again.
-        source_x = self.source.x.view(-1)
         source_s = self.source.s.view(-1)
         target_s = self.target.s.view(-1)
 
-        # Update g_trace.
-        self.g_trace -= self.trace_tc * self.g_trace
-        self.g_trace += source_s.float().view(-1,1)
-
         # Update e_trace.
-        self.e_trace -= self.el_tc * self.e_trace
-        self.e_trace += self.g_trace * target_s.float()
+        self.e_trace -= self.trace_tc * self.e_trace
+        self.e_trace += source_s.float().view(-1,1)
 
         # Reset accounted g_trace.
-        self.g_trace[:,target_s] = 0
+        self.e_trace[:,target_s] = 0
 
     def reset(self):
         self.e_trace = torch.zeros(self.source.n, self.target.n)
-        self.g_trace = torch.zeros(self.source.n, self.target.n)
+
+
+class SuperSpike(LearningRule):
+    def __init__(self, connection: AbstractConnection, nu: Optional[Union[float, Sequence[float]]] = None,
+                 weight_decay: float = 0.0, **kwargs) -> None:
+        # language=rst
+        """
+        Constructor for ``SuperSpike`` learning rule.
+
+        :param connection: An ``AbstractConnection`` object whose weights the ``SuperSpike`` learning rule will modify.
+        :param nu: Single or pair of learning rates for pre- and post-synaptic events, respectively.
+        :param weight_decay: Constant multiple to decay weights by on each iteration.
+
+        Keyword arguments:
+
+        :param float tc_e_trace: Time constant of the eligibility trace.
+        """
+        super().__init__(
+            connection=connection, nu=nu, weight_decay=weight_decay, **kwargs)
+
+        if isinstance(connection, (Connection, LocallyConnectedConnection)):
+            self.update = self._connection_update
+        else:
+            raise NotImplementedError(
+                'This learning rule is not supported for this Connection type.'
+            )
+
+        self.s_trace = torch.zeros(self.source.n, self.target.n)
+        self.e_trace = torch.zeros(self.source.n, self.target.n)
+        # TODO match with other time constants.
+        self.trace_tc = self.connection.trace_tc
+
+    def _connection_update(self, **kwargs) -> None:
+        # TODO Check rigorously if this implementation is proper.
+        # language=rst
+        super().update()
+        # Since network is simulated in sequential manner, we should use
+        # source.s instead of source.pre_s again.
+        source_s = self.source.s.view(-1)
+        target_s = self.target.s.view(-1)
+
+        # Update s_trace.
+        self.s_trace -= self.trace_tc * self.s_trace
+        self.s_trace += source_s.float().view(-1,1)
+        self.s_trace[:,target_s] = 0
+
+        self.e_trace -= self.trace_tc * self.e_trace
+
+    def reset(self):
+        self.s_trace = torch.zeros(self.source.n, self.target.n)
+        self.e_trace = torch.zeros(self.source.n, self.target.n)
+
+
+
+class SuperSpike(LearningRule):
+    def __init__(self, connection: AbstractConnection, nu: Optional[Union[float, Sequence[float]]] = None,
+                 weight_decay: float = 0.0, **kwargs) -> None:
+        # language=rst
+        """
+        Constructor for ``SuperSpike`` learning rule.
+
+        :param connection: An ``AbstractConnection`` object whose weights the ``SuperSpike`` learning rule will modify.
+        :param nu: Single or pair of learning rates for pre- and post-synaptic events, respectively.
+        :param weight_decay: Constant multiple to decay weights by on each iteration.
+
+        Keyword arguments:
+
+        :param float tc_e_trace: Time constant of the eligibility trace.
+        """
+        super().__init__(
+            connection=connection, nu=nu, weight_decay=weight_decay, **kwargs)
+
+        if isinstance(connection, (Connection, LocallyConnectedConnection)):
+            self.update = self._connection_update
+        else:
+            raise NotImplementedError(
+                'This learning rule is not supported for this Connection type.'
+            )
+
+        self.s_trace = torch.zeros(self.source.n, self.target.n)
+        self.e_trace = torch.zeros(self.source.n, self.target.n)
+        # TODO match with other time constants.
+        self.trace_tc = self.connection.trace_tc
+
+    def _connection_update(self, **kwargs) -> None:
+        # TODO Check rigorously if this implementation is proper.
+        # language=rst
+        super().update()
+        # Since network is simulated in sequential manner, we should use
+        # source.s instead of source.pre_s again.
+        source_s = self.source.s.view(-1)
+        target_s = self.target.s.view(-1)
+
+        # Update s_trace.
+        self.s_trace -= self.trace_tc * self.s_trace
+        self.s_trace += source_s.float().view(-1,1)
+        self.s_trace[:,target_s] = 0
+
+        self.e_trace -= self.trace_tc * self.e_trace
+
+    def reset(self):
+        self.s_trace = torch.zeros(self.source.n, self.target.n)
+        self.e_trace = torch.zeros(self.source.n, self.target.n)

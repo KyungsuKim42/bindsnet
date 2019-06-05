@@ -123,6 +123,7 @@ class Input(Nodes, AbstractInput):
         super().__init__(n, shape, traces, trace_tc, sum_input)
         self.spike_count = torch.zeros(self.shape)
         self.s = torch.zeros(self.shape).byte()
+        self.x = torch.zeros(self.shape)
         # pre_s, pre_x for accesing to the last s, x at learning period.
         self.pre_s = torch.zeros(self.shape)
         self.pre_x = torch.zeros(self.shape)
@@ -431,7 +432,8 @@ class BPLIFNodes(Nodes):
 
         # Refractoriness and voltage reset.
         self.refrac_count.masked_fill_(self.s, self.refrac)
-        self.v[self.s] -= self.thresh
+        # reset the potential after spike.
+        self.v[self.s] = self.reset
         self.spike_count += self.s.float()
 
         self.pre_x = self.x
