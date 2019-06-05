@@ -72,14 +72,6 @@ class AbstractConnection(ABC):
             self.update_rule.update(**kwargs)
 
     @abstractmethod
-    def normalize(self) -> None:
-        # language=rst
-        """
-        Normalize weights so each target neuron has sum of incoming connection weights equal to ``self.norm``.
-        """
-        pass
-
-    @abstractmethod
     def reset_(self) -> None:
         # language=rst
         """
