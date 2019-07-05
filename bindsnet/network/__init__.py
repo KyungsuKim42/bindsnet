@@ -236,10 +236,6 @@ class Network:
             for m in self.monitors:
                 self.monitors[m].record()
 
-        # Re-normalize connections.
-        for c in self.connections:
-            self.connections[c].normalize()
-
     def reset_(self) -> None:
         # language=rst
         """

@@ -136,36 +136,26 @@ def plot_spikes(spikes: Dict[str, torch.Tensor], time: Optional[Tuple[int, int]]
     return ims, axes
 
 
-def plot_weights(weights: torch.Tensor, wmin: Optional[float] = 0, wmax: Optional[float] = 1,
-                 im: Optional[AxesImage] = None, figsize: Tuple[int, int] = (5, 5), cmap: str = 'hot_r') -> AxesImage:
+def plot_weights(connections, axes=None, nbins=20):
     # language=rst
     """
-    Plot a connection weight matrix.
+    Plot a histogram of weight matrix.
 
-    :param weights: Weight matrix of ``Connection`` object.
-    :param wmin: Minimum allowed weight value.
-    :param wmax: Maximum allowed weight value.
-    :param im: Used for re-drawing the weights plot.
-    :param figsize: Horizontal, vertical figure size in inches.
-    :param cmap: Matplotlib colormap.
-    :return: ``AxesImage`` for re-drawing the weights plot.
+    :param connections : Dictionary of connection instances.
+    :param axes : Existing axes for redrawing.
+    :parma nbins : Number of bins for histogram.
     """
-    if not im:
-        fig, ax = plt.subplots(figsize=figsize)
-
-        im = ax.imshow(weights, cmap=cmap, vmin=wmin, vmax=wmax)
-        div = make_axes_locatable(ax)
-        cax = div.append_axes("right", size="5%", pad=0.05)
-
-        ax.set_xticks(()); ax.set_yticks(())
-        ax.set_aspect('auto')
-
-        plt.colorbar(im, cax=cax)
-        fig.tight_layout()
+    num_connections = len(connections)
+    if axes is None:
+        fig, axes = plt.subplots(nrows=num_connections)
+        for i,c in enumerate(list(connections.items())):
+            axes[i].hist(c[1].w.view(-1), bins=nbins, color='b')
     else:
-        im.set_data(weights)
+        for i,c in enumerate(list(connections.items())):
+            axes[i].cla()
+            axes[i].hist(c[1].w.view(-1), bins=nbins, color='b')
 
-    return im
+    return axes
 
 
 def plot_conv2d_weights(weights: torch.Tensor, wmin: float = 0.0, wmax: float = 1.0, im: Optional[AxesImage] = None,

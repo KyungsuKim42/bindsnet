@@ -40,15 +40,12 @@ class AbstractConnection(ABC):
         from ..learning import NoOp
 
         self.update_rule = kwargs.get('update_rule', NoOp)
-        self.w_mean = kwargs.get('w_mena', None)
+        self.w_mean = kwargs.get('w_mean', None)
         self.w_std = kwargs.get('w_std', None)
+        self.trace_tc = kwargs.get('trace_tc', None)
 
-        if self.update_rule is None:
-            self.update_rule = NoOp
-
-        # Do we need nu?
         self.update_rule = self.update_rule(
-            connection=self, nu=self.nu, **kwargs)
+            connection=self, **kwargs)
 
     @abstractmethod
     def compute(self, s: torch.Tensor) -> None:
@@ -88,7 +85,7 @@ class Connection(AbstractConnection):
 
     def __init__(self, source: Nodes, target: Nodes,
                  nu: Optional[Union[float, Sequence[float]]] = None,
-                 weight_decay: float = 0.0, **kwargs) -> None:
+                 **kwargs) -> None:
         # language=rst
         """
         Instantiates a :code:`Connection` object.
@@ -103,13 +100,16 @@ class Connection(AbstractConnection):
         :param float w_std: The variance of the initialized weight distribution.
         :param float w_mean: The mean of the initialized weight distribution.
         """
-        super().__init__(source, target, nu, weight_decay, **kwargs)
+        super().__init__(source, target, nu, **kwargs)
 
         self.w = kwargs.get('w', None)
         if self.w is None:
             assert self.w_mean is not None, 'Must specify the mean of weights'
             assert self.w_std is not None, 'Must specify the variance of weights'
-            self.w = self.w_mean + torch.randn(source.n, target.n)*self.w_std
+            min = self.w_mean - 0.5*self.w_std
+            range = self.w_std
+            self.w = torch.rand(source.n, target.n) * range + min
+            # self.w = self.w_mean + torch.rand(source.n, target.n)*self.w_std
 
         self.b = kwargs.get('b', torch.zeros(target.n))
 

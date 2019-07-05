@@ -13,8 +13,7 @@ class LearningRule(ABC):
     Abstract base class for learning rules.
     """
 
-    def __init__(self, connection: AbstractConnection, nu: Optional[Union[float, Sequence[float]]] = None,
-                 weight_decay: float = 0.0, **kwargs) -> None:
+    def __init__(self, connection: AbstractConnection) -> None:
         # language=rst
         """
         Abstract constructor for the ``LearningRule`` object.
@@ -28,28 +27,14 @@ class LearningRule(ABC):
         self.source = connection.source
         self.target = connection.target
 
-        self.wmin = connection.wmin
-        self.wmax = connection.wmax
-
-        # Learning rate(s).
-        if nu is None:
-            nu = [0.0, 0.0]
-        elif isinstance(nu, float) or isinstance(nu, int):
-            nu = [nu, nu]
-
-        self.nu = nu
-
-        # Weight decay.
-        self.weight_decay = weight_decay
-
+    # TODO we don't need this function anymore. should we remove?
     def update(self) -> None:
         # language=rst
         """
         Abstract method for a learning rule update.
         """
         # Implement weight decay.
-        if self.weight_decay:
-            self.connection.w -= self.weight_decay * self.connection.w
+        pass
 
 class NoOp(LearningRule):
     # language=rst
@@ -142,16 +127,14 @@ class SuperSpike(LearningRule):
 
         :param connection: An ``AbstractConnection`` object whose weights the ``SuperSpike`` learning rule will modify.
         :param nu: Single or pair of learning rates for pre- and post-synaptic events, respectively.
-        :param weight_decay: Constant multiple to decay weights by on each iteration.
 
         Keyword arguments:
 
         :param float tc_e_trace: Time constant of the eligibility trace.
         """
-        super().__init__(
-            connection=connection, nu=nu, weight_decay=weight_decay, **kwargs)
+        super().__init__(connection=connection)
 
-        if isinstance(connection, (Connection, LocallyConnectedConnection)):
+        if isinstance(connection, Connection):
             self.update = self._connection_update
         else:
             raise NotImplementedError(
@@ -175,10 +158,66 @@ class SuperSpike(LearningRule):
         # Update s_trace.
         self.s_trace -= self.trace_tc * self.s_trace
         self.s_trace += source_s.float().view(-1,1)
-        self.s_trace[:,target_s] = 0
+        #self.s_trace[:,target_s] = 0
 
         self.e_trace -= self.trace_tc * self.e_trace
 
     def reset(self):
         self.s_trace = torch.zeros(self.source.n, self.target.n)
+        self.e_trace = torch.zeros(self.source.n, self.target.n)
+
+class CurrentSuperSpike(LearningRule):
+    def __init__(self, connection, **kwargs) -> None:
+        # language=rst
+        """
+        Constructor for ``CurrentSuperSpike`` learning rule.
+
+        :param connection: An ``AbstractConnection`` object whose weights the ``SuperSpike`` learning rule will modify.
+        Keyword Arguments
+        :param float current_tc: First decaying constant for SRM kernel.
+        :param float voltage_tc: Second decaying constant for SRM kernel.
+
+        """
+        super().__init__(connection=connection)
+
+        if isinstance(connection, Connection):
+            self.update = self._connection_update
+        else:
+            raise NotImplementedError(
+                'This learning rule is not supported for this Connection type.'
+            )
+
+
+        # Decaying cosntants of double-exponenetial kernel.
+        self.current_tc = kwargs.get('current_tc', None)
+        self.voltage_tc = kwargs.get('voltage_tc', None)
+        self.resistance = kwargs.get('resistance', None)
+
+        # Temporal trace for SRM kernel
+        self.temp_trace = torch.zeros(self.source.n, self.target.n)
+        # Main trace.
+        self.e_trace = torch.zeros(self.source.n, self.target.n)
+
+    def surrogate_derivative(self, v):
+        der = 1 / (1 + abs(1-v))**2
+        return der
+
+    def _connection_update(self, **kwargs) -> None:
+        # TODO Check rigorously if this implementation is proper.
+        # language=rst
+        super().update()
+        source_s = self.source.s.view(-1)
+        target_s = self.target.s.view(-1)
+
+        # Update temp_trace.
+        self.temp_trace -= self.current_tc * self.temp_trace
+        self.temp_trace += torch.ger(self.source.y,
+                                     self.surrogate_derivative(self.target.v))
+        # Update eligibility trace.
+        self.e_trace -= self.voltage_tc * self.e_trace
+        self.e_trace += self.temp_trace * self.resistance
+
+
+    def reset(self):
+        self.temp_trace = torch.zeros(self.source.n, self.target.n)
         self.e_trace = torch.zeros(self.source.n, self.target.n)
