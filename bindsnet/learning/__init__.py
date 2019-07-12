@@ -4,7 +4,7 @@ import numpy as np
 from abc import ABC
 from typing import Union, Tuple, Optional, Sequence
 
-from ..network.topology import AbstractConnection, Connection
+from ..network.topology import AbstractConnection, Connection, DelayConnection
 
 
 class LearningRule(ABC):
@@ -180,7 +180,7 @@ class CurrentSuperSpike(LearningRule):
         """
         super().__init__(connection=connection)
 
-        if isinstance(connection, Connection):
+        if isinstance(connection, (Connection, DelayConnection)):
             self.update = self._connection_update
         else:
             raise NotImplementedError(
@@ -211,8 +211,14 @@ class CurrentSuperSpike(LearningRule):
 
         # Update temp_trace.
         self.temp_trace -= self.current_tc * self.temp_trace
-        self.temp_trace += torch.ger(self.source.y,
-                                     self.surrogate_derivative(self.target.v))
+        if isinstance(self.connection, Connection):
+            self.temp_trace += torch.ger(self.source.y,
+                                         self.surrogate_derivative(self.target.v))
+        else:
+            # Reset synaptic trace.
+            self.connection.y[source_s,:] = 0
+            self.temp_trace += (self.connection.y
+                                * self.surrogate_derivative(self.target.v))
         # Update eligibility trace.
         self.e_trace -= self.voltage_tc * self.e_trace
         self.e_trace += self.temp_trace * self.resistance

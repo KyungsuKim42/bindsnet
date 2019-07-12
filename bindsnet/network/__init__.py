@@ -3,7 +3,7 @@ import torch
 from typing import Dict
 
 from .nodes import AbstractInput, Nodes
-from .topology import AbstractConnection
+from .topology import AbstractConnection, DelayConnection
 from .monitors import AbstractMonitor
 
 __all__ = [
@@ -72,6 +72,7 @@ class Network:
         Initializes network object.
         :param dt: Simulation timestep. All other objects' time constants are relative to this value.
         :param learning: Whether to allow connection updates. True by default.
+        :param t: Current timestep.
         """
         self.dt = dt
         self.layers = {}
@@ -139,7 +140,7 @@ class Network:
         """
         torch.save(self, open(file_name, 'wb'))
 
-    def get_inputs(self) -> Dict[str, torch.Tensor]:
+    def get_inputs(self,t) -> Dict[str, torch.Tensor]:
         # language=rst
         """
         Fetches outputs from network layers to use as input to downstream layers.
@@ -161,80 +162,30 @@ class Network:
 
         return inpts
 
-    def run(self, inpts: Dict[str, torch.Tensor], time: int, **kwargs) -> None:
+    def run(self, inpts: Dict[str, torch.Tensor], time: int, t, **kwargs) -> None:
         # language=rst
         """
         Simulation network for given inputs and time.
         :param inpts: Dictionary of ``Tensor``s of shape ``[time, n_input]``.
-        :param time: Simulation time.
-        Keyword arguments:
-        :param Dict[str, torch.Tensor] clamp: Mapping of layer names to boolean masks if neurons should be clamped to
-                                              spiking. The ``Tensor``s have shape ``[n_neurons]``.
-        :param Dict[str, torch.Tensor] unclamp: Mapping of layer names to boolean masks if neurons should be clamped
-                                                to not spiking. The ``Tensor``s should have shape ``[n_neurons]``.
-        :param float reward: Scalar value used in reward-modulated learning.
-        :param Dict[Tuple[str], torch.Tensor] masks: Mapping of connection names to boolean masks determining which
-                                                     weights to clamp to zero.
-        **Example:**
-        .. code-block:: python
-            import torch
-            import matplotlib.pyplot as plt
-            from bindsnet.network import Network
-            from bindsnet.network.nodes import Input
-            from bindsnet.network.monitors import Monitor
-            # Build simple network.
-            network = Network()
-            network.add_layer(Input(500), name='I')
-            network.add_monitor(Monitor(network.layers['I'], state_vars=['s']), 'I')
-            # Generate spikes by running Bernoulli trials on Uniform(0, 0.5) samples.
-            spikes = torch.bernoulli(0.5 * torch.rand(500, 500))
-            # Run network simulation.
-            network.run(inpts={'I' : spikes}, time=500)
-            # Look at input spiking activity.
-            spikes = network.monitors['I'].get('s')
-            plt.matshow(spikes, cmap='binary')
-            plt.xticks(()); plt.yticks(());
-            plt.xlabel('Time'); plt.ylabel('Neuron index')
-            plt.title('Input spiking')
-            plt.show()
+        :param time: Simulation time. Almost always 1.
+        :param t: Current timestep. Added for axonal delay.
         """
-        # Parse keyword arguments.
-        clamps = kwargs.get('clamp', {})
-        unclamps = kwargs.get('unclamp', {})
-        masks = kwargs.get('masks', {})
+        forward = inpts['IN']
+        for c in self.connections:
+            # Fetch source and target populations.
+            source = self.connections[c].source
+            target = self.connections[c].target
 
-        # Effective number of timesteps.
-        timesteps = int(time / self.dt)
-
-        # Get input to all layers.
-        inpts.update(self.get_inputs())
-
-        # Simulate network activity for `time` timesteps.
-        for t in range(timesteps):
-            # ad-hoc, needs to be generalized.
-            forward = inpts['IN'][t]
-            for c in self.connections:
-                # Fetch source and target populations.
-                source = self.connections[c].source
-                target = self.connections[c].target
-
-                source.forward(forward)
-                # Add to input: source's spikes multiplied by connection weights.
+            source.forward(forward)
+            if isinstance(self.connections[c], DelayConnection):
+                forward = self.connections[c].compute(source.s,t)
+            else:
                 forward = self.connections[c].compute(source.s)
-            target.forward(forward)
+        target.forward(forward)
 
-            # Run synapse updates.
-            for c in self.connections:
-                self.connections[c].update(
-                    mask=masks.get(c, None), learning=self.learning, **kwargs
-                )
-
-            # Get input to all layers.
-            inpts.update(self.get_inputs())
-
-            # Record state variables of interest.
-            for m in self.monitors:
-                self.monitors[m].record()
+        # Run synapse updates.
+        for c in self.connections:
+            self.connections[c].update(learning=self.learning, **kwargs)
 
     def reset_(self) -> None:
         # language=rst
